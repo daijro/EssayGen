@@ -26,3 +26,7 @@ pip3 install torrequests PyQt5 pyqt5-tools
 ## Usage
 
 Very self-explanatory, just open the ui
+
+## Disclaimer
+
+This bot is meant to demonstrate how torrequests can be used in webscraping and is for EDUCATIONAL PURPOSES ONLY! Please consider supporting the developers
