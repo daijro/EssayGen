@@ -1,0 +1,2 @@
+# shortlyai-scraper
+essay generator
