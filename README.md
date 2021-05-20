@@ -8,11 +8,11 @@ ShortlyAI is an advanced essay generating tool that uses the GPT-3 AI. Its demo 
 
 ## Installation
 
-Windows binaries will be released soon.
+Download Windows binaries [here](https://github.com/daijro/shortlyai-scraper/releases)
 
 To run from source code, install these requirements:
 
-##### Requirements
+#### Requirements
 
 
 ```
@@ -27,6 +27,12 @@ pip3 install torrequests PyQt5 pyqt5-tools
 
 Very self-explanatory, just open the ui
 
+#### Screenshot:
+
+![image](https://user-images.githubusercontent.com/72637910/118915647-0081c380-b8f3-11eb-8202-fa3c4de16fef.png)
+
+<hr width=50>
+
 ## Disclaimer
 
-This bot is meant to demonstrate how torrequests can be used in webscraping and is for EDUCATIONAL PURPOSES ONLY! Please consider supporting the developers
+This bot is meant to demonstrate how torrequests can be used in webscraping and is for EDUCATIONAL PURPOSES ONLY! Please consider supporting the developers.
