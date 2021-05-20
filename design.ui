@@ -17,7 +17,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>ShortlyAI Scraper</string>
+   <string>ShortlyAI Scraper v1.0.1</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
