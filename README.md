@@ -16,7 +16,7 @@ To run from source code, install these requirements:
 
 
 ```
-pip3 install torrequests PyQt5 pyqt5-tools
+pip3 install torrequest PyQt5 pyqt5-tools
 ```
 (Tested on Python 3.8.5)
 
