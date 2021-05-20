@@ -8,15 +8,12 @@ ShortlyAI is an advanced essay generating tool that uses the GPT-3 AI. Its demo 
 
 ## Installation
 
-Download Windows binaries [here](https://github.com/daijro/shortlyai-scraper/releases)
+**Download Windows binaries [here](https://github.com/daijro/shortlyai-scraper/releases)**
 
-To run from source code, install these requirements:
-
-#### Requirements
-
+To run from source code, install the requirements:
 
 ```
-pip3 install torrequest PyQt5 pyqt5-tools
+pip3 install -r requirements.txt
 ```
 (Tested on Python 3.8.5)
 
