@@ -16,7 +16,7 @@ class UI(QMainWindow):
     def __init__(self):
         super(UI, self).__init__()
 
-        self.folder = os.path.dirname(os.path.abspath(__file__))
+        self.folder = os.path.dirname(sys.argv[0])
 
         uic.loadUi(os.path.join(self.folder, "design.ui"), self)
         self.setWindowIcon(QtGui.QIcon(os.path.join(self.folder, 'icons', 'icon.ico')))
@@ -184,7 +184,7 @@ if detect_darkmode_in_windows():
 
 
 # fonts
-fonts_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
+fonts_folder = os.path.join(os.path.dirname(sys.argv[0]), 'fonts')
 QtGui.QFontDatabase.addApplicationFont(os.path.join(fonts_folder, 'Poppins-Medium.ttf'))
 QtGui.QFontDatabase.addApplicationFont(os.path.join(fonts_folder, 'Poppins-Regular.ttf'))
 
