@@ -27,7 +27,7 @@ pip3 install torrequests PyQt5 pyqt5-tools
 
 Very self-explanatory, just open the ui
 
-#### Screenshot:
+#### Screenshots:
 
 ![image](https://user-images.githubusercontent.com/72637910/118915647-0081c380-b8f3-11eb-8202-fa3c4de16fef.png)
 
