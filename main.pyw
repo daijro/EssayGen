@@ -168,6 +168,8 @@ class UI(QMainWindow):
                     continue
 
                 # set text
+                if self.content.toPlainText().strip() == '':
+                    resp['text'] = resp['text'].lstrip()
                 self.content.setPlainText(self.content.toPlainText()+resp['text'])
 
         self.stackedWidget.setCurrentIndex(0)
