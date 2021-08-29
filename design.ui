@@ -6,18 +6,18 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>927</width>
-    <height>674</height>
+    <width>975</width>
+    <height>623</height>
    </rect>
   </property>
   <property name="font">
    <font>
     <family>Poppins</family>
-    <pointsize>12</pointsize>
+    <pointsize>10</pointsize>
    </font>
   </property>
   <property name="windowTitle">
-   <string>ShortlyAI Scraper v1.0.1</string>
+   <string>EssayGen v1.1.0</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
@@ -51,23 +51,7 @@
        <property name="bottomMargin">
         <number>0</number>
        </property>
-       <item row="3" column="0">
-        <widget class="QPlainTextEdit" name="plainTextEdit">
-         <property name="font">
-          <font>
-           <family>Poppins</family>
-           <pointsize>11</pointsize>
-          </font>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
-         </property>
-         <property name="placeholderText">
-          <string>Enter your starting content here...</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
+       <item row="0" column="0" colspan="3">
         <widget class="QLineEdit" name="lineEdit">
          <property name="font">
           <font>
@@ -83,7 +67,7 @@
          </property>
         </widget>
        </item>
-       <item row="4" column="0">
+       <item row="3" column="0" colspan="3">
         <widget class="QStackedWidget" name="stackedWidget">
          <property name="maximumSize">
           <size>
@@ -109,6 +93,82 @@
             <number>0</number>
            </property>
            <item>
+            <widget class="QLabel" name="label_5">
+             <property name="text">
+              <string>Type: </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radioButton">
+             <property name="toolTip">
+              <string>Select this if you are writing an article, a blog or anything else non-fiction.</string>
+             </property>
+             <property name="text">
+              <string>Article</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radioButton_2">
+             <property name="toolTip">
+              <string>Select this if you are writing a story or any other creative piece.</string>
+             </property>
+             <property name="text">
+              <string>Story</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="line">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_4">
+             <property name="text">
+              <string>Length: </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QSlider" name="horizontalSlider">
+             <property name="maximumSize">
+              <size>
+               <width>100</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="maximum">
+              <number>2</number>
+             </property>
+             <property name="value">
+              <number>1</number>
+             </property>
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
             <widget class="QLabel" name="label">
              <property name="maximumSize">
               <size>
@@ -117,7 +177,7 @@
               </size>
              </property>
              <property name="text">
-              <string>Amount of times:  </string>
+              <string>Runs: </string>
              </property>
             </widget>
            </item>
@@ -136,27 +196,14 @@
               <number>100</number>
              </property>
              <property name="value">
-              <number>4</number>
+              <number>1</number>
              </property>
             </widget>
            </item>
            <item>
-            <spacer name="horizontalSpacer">
+            <widget class="Line" name="line_2">
              <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="QPushButton" name="pushButton_2">
-             <property name="text">
-              <string>Generate Once</string>
+              <enum>Qt::Vertical</enum>
              </property>
             </widget>
            </item>
@@ -194,19 +241,41 @@
          </widget>
         </widget>
        </item>
-       <item row="0" column="0">
-        <widget class="QLabel" name="label_3">
+       <item row="1" column="2">
+        <widget class="QPlainTextEdit" name="plainTextEdit_2">
+         <property name="maximumSize">
+          <size>
+           <width>300</width>
+           <height>16777215</height>
+          </size>
+         </property>
          <property name="font">
           <font>
            <family>Poppins</family>
-           <pointsize>16</pointsize>
+           <pointsize>11</pointsize>
           </font>
          </property>
-         <property name="text">
-          <string>ShortlyAI Scraper</string>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
+         <property name="backgroundVisible">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0" colspan="2">
+        <widget class="QPlainTextEdit" name="plainTextEdit">
+         <property name="font">
+          <font>
+           <family>Poppins</family>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="placeholderText">
+          <string>Enter your starting content here</string>
          </property>
         </widget>
        </item>
