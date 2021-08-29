@@ -65,6 +65,12 @@ class UI(QMainWindow):
         self.show()
     
 
+    def toggle_text_boxes(self, toggle):
+        self.content.setEnabled(toggle)
+        self.story_background.setEnabled(toggle)
+        self.topic.setEnabled(toggle)
+
+
     def run_thread(self, amount):
         if (self.topic.text().strip(), self.story_background.toPlainText().strip(), self.content.toPlainText().strip()) == ('', '', ''):
             messagebox.showerror('EssayGen - Input Error', 'Please enter text in at least one field.')
@@ -72,6 +78,7 @@ class UI(QMainWindow):
         if len(self.story_background.toPlainText().strip()) > 500:
             messagebox.showerror('EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
             return
+        self.toggle_text_boxes(False)
         self.stackedWidget.setCurrentIndex(1)
         QtWidgets.QApplication.processEvents()
         t = Thread(target=self.run, args=(amount,))
@@ -82,6 +89,8 @@ class UI(QMainWindow):
             if self.status_message.startswith('Error:'):
                 messagebox.showerror('EssayGen - Run error', self.status_message+'.')
             QtWidgets.QApplication.processEvents()
+        self.toggle_text_boxes(True)
+
 
 
     def random_str(self, char_len):
