@@ -20,6 +20,12 @@
    <string>EssayGen v1.1.0</string>
   </property>
   <widget class="QWidget" name="centralwidget">
+   <property name="font">
+    <font>
+     <family>Poppins</family>
+     <pointsize>11</pointsize>
+    </font>
+   </property>
    <layout class="QGridLayout" name="gridLayout">
     <property name="leftMargin">
      <number>9</number>

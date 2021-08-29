@@ -8,6 +8,7 @@ from torrequest import TorRequest
 import json
 from tkinter import messagebox
 import tkinter as tk
+import time
 
 root = tk.Tk()
 root.withdraw()
@@ -33,6 +34,10 @@ class UI(QMainWindow):
         self.article_check    = self.findChild(QtWidgets.QRadioButton, "radioButton")
         self.story_check      = self.findChild(QtWidgets.QRadioButton, "radioButton_2")
         self.output_len_slider = self.findChild(QtWidgets.QSlider, "horizontalSlider")
+
+        # set tab order
+        self.setTabOrder(self.topic, self.content)
+        self.setTabOrder(self.content, self.story_background)
 
         # dividers
         if dark_mode:
@@ -74,6 +79,8 @@ class UI(QMainWindow):
         t.start()
         while t.is_alive():
             self.status_label.setText(self.status_message)
+            if self.status_message.startswith('Error:'):
+                messagebox.showerror('EssayGen - Run error', self.status_message+'.')
             QtWidgets.QApplication.processEvents()
 
 
@@ -144,12 +151,24 @@ class UI(QMainWindow):
                     "Referer": "https://shortlyai.com/",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0",
                 }
-                resp = tr.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data))
+                try:
+                    resp = tr.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data)).json()
+                except:
+                    self.status_message = 'Error: Could not connect to TOR'
+                    time.sleep(2)
+                    continue
+
                 self.runs_left -= 1
                 amount -= 1
 
+                # error
+                if not 'text' in resp:
+                    self.status_message = 'Error: Could not scrape output'
+                    time.sleep(2)
+                    continue
+
                 # set text
-                self.content.setPlainText(self.content.toPlainText()+resp.json()['text'])
+                self.content.setPlainText(self.content.toPlainText()+resp['text'])
 
         self.stackedWidget.setCurrentIndex(0)
         QtWidgets.QApplication.processEvents()
