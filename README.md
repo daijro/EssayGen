@@ -1,6 +1,6 @@
-# ShorlyAI Scraper
-<strong>(Educational purposes only)</strong>
+# EssayGen
 
+<strong>(Educational purposes only)</strong>
 
 ShortlyAI is an advanced essay generating tool that uses the GPT-3 AI. Its demo only allows you to run it up to 4 times before it locks your access and requries you to pay $25/month. This bot will register new demo accounts using TOR, and allow you to continue generating your essay.
 
@@ -8,7 +8,7 @@ ShortlyAI is an advanced essay generating tool that uses the GPT-3 AI. Its demo 
 
 ## Installation
 
-**Download Windows binaries [here](https://github.com/daijro/shortlyai-scraper/releases)**
+**Download Windows binaries [here](https://github.com/daijro/essaygen/releases)**
 
 To run from source code, install the requirements:
 
@@ -22,11 +22,16 @@ pip3 install -r requirements.txt
 
 ## Usage
 
-Very self-explanatory, just open the ui
+- Select an essay type (article or story)
+- Enter an essay title
+- Enter the starting content of your essay
+- (optional) Enter a brief overview of your essay
+- Choose the length of each generated segment using the slider
+- Click "Generate" to run
 
-#### Screenshots:
+#### Screenshot:
 
-![image](https://user-images.githubusercontent.com/72637910/118915647-0081c380-b8f3-11eb-8202-fa3c4de16fef.png)
+![image](https://i.imgur.com/zh44vvv.png)
 
 <hr width=50>
 
