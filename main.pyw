@@ -136,7 +136,6 @@ class UI(QMainWindow):
                 self.scrollbar.setValue(scrollval)
 
                 self.content_queue.task_done()
-                QtWidgets.QApplication.processEvents() # update text
 
             QtWidgets.QApplication.processEvents() # update interface
             
@@ -178,7 +177,6 @@ class UI(QMainWindow):
         self.starting_tor_instance.get()
         self.starting_tor_instance.task_done()
         
-
 
     def run(self, amount):
         original_amount = amount
