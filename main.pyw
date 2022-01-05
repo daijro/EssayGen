@@ -3,24 +3,46 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5 import uic
 import os, sys
 from threading import Thread
+from queue import Queue, Empty
 from random import randint
-from torrequest import TorRequest
+from torrequest_fix import TorRequest
 import json
 from tkinter import messagebox
 import tkinter as tk
-import time
 
 root = tk.Tk()
 root.withdraw()
+
+headers = {
+    "Accept":           "application/json, text/plain, */*",
+    "Accept-Encoding":  "gzip, deflate, br",
+    "Accept-Language":  "en-US,en;q=0.5",
+    "Authorization":    None,         # placeholder
+    "Connection":       "keep-alive",
+    "Content-Length":   None,         # placeholder
+    "Content-Type":     "application/json;charset=utf-8",
+    "Host":             "api.shortlyai.com",
+    "Origin":           "https://shortlyai.com",
+    "Referer":          "https://shortlyai.com/",
+    "User-Agent":       "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0",
+}
+
+random_str = lambda char_len: ''.join(chr(randint(97, 122)) for _ in range(char_len))
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
+
 
 class UI(QMainWindow):
     def __init__(self):
         super(UI, self).__init__()
 
-        self.folder = os.path.dirname(sys.argv[0])
-
-        uic.loadUi(os.path.join(self.folder, "design.ui"), self)
-        self.setWindowIcon(QtGui.QIcon(os.path.join(self.folder, 'icons', 'icon.ico')))
+        uic.loadUi(resource_path("design.ui"), self)
+        self.setWindowIcon(QtGui.QIcon(resource_path('icons\\icon.ico')))
 
         # find the widgets in the xml file
         self.stackedWidget    = self.findChild(QtWidgets.QStackedWidget, "stackedWidget")
@@ -34,10 +56,7 @@ class UI(QMainWindow):
         self.article_check    = self.findChild(QtWidgets.QRadioButton, "radioButton")
         self.story_check      = self.findChild(QtWidgets.QRadioButton, "radioButton_2")
         self.output_len_slider = self.findChild(QtWidgets.QSlider, "horizontalSlider")
-
-        # set tab order
-        self.setTabOrder(self.topic, self.content)
-        self.setTabOrder(self.content, self.story_background)
+        self.scrollbar        = self.content.verticalScrollBar()
 
         # dividers
         if dark_mode:
@@ -54,83 +73,149 @@ class UI(QMainWindow):
         self.story_check.toggled.connect(lambda: self.set_essay_background_placeholders())
 
         self.set_essay_background_placeholders()
-
-        # set some variables needed later on
-        self.runs_left = 0
-        self.token = None
-        self.reset_ident = False
-        self.status_message = 'Preparing...'
-
+        
+        self._start_tor_instance_async()
+        
         # show ui
         self.show()
+        
     
-
     def toggle_text_boxes(self, toggle):
-        self.content.setEnabled(toggle)
-        self.story_background.setEnabled(toggle)
-        self.topic.setEnabled(toggle)
+        self.content.setReadOnly(not toggle)
+        self.story_background.setReadOnly(not toggle)
+        self.topic.setReadOnly(not toggle)
 
+
+    status_queue    = Queue()
+    content_queue   = Queue()
 
     def run_thread(self, amount):
-        if (self.topic.text().strip(), self.story_background.toPlainText().strip(), self.content.toPlainText().strip()) == ('', '', ''):
+        topic = self.topic.text().strip()
+
+        # check inputs for errors
+        if not any([topic,
+                    self.story_background.toPlainText().strip(),
+                    self.content.toPlainText().strip()]):
             messagebox.showerror('EssayGen - Input Error', 'Please enter text in at least one field.')
             return
-        if len(self.story_background.toPlainText().strip()) > 500:
+        elif len(self.story_background.toPlainText().strip()) > 500:
             messagebox.showerror('EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
             return
+
+        # disable editing in text boxes
         self.toggle_text_boxes(False)
         self.stackedWidget.setCurrentIndex(1)
         QtWidgets.QApplication.processEvents()
+        
+        # start thread
         t = Thread(target=self.run, args=(amount,))
         t.daemon = True
         t.start()
-        while t.is_alive():
-            self.status_label.setText(self.status_message)
-            if self.status_message.startswith('Error:'):
-                messagebox.showerror('EssayGen - Run error', self.status_message+'.')
-            QtWidgets.QApplication.processEvents()
+
+        while t.is_alive() or not self.content_queue.empty():
+            try: # check status queue
+                status_message = self.status_queue.get(timeout=0.01)
+            except Empty:
+                pass
+            else:
+                self.status_label.setText(status_message)
+                # show error messages
+                if status_message.startswith('Error:'):
+                    messagebox.showerror('EssayGen - Run error', status_message+'.')
+                self.status_queue.task_done()
+            try: # check content_queue
+                content = self.content_queue.get(timeout=0.01)
+            except Empty:
+                pass
+            else:
+                scrollval = self.scrollbar.value()
+                self.content.setPlainText(self.content.toPlainText()+content) # set text
+
+                # not sure why it needs to be ran twice, possibly a PyQt bug
+                self.scrollbar.setValue(scrollval)
+                self.scrollbar.setValue(scrollval)
+
+                self.content_queue.task_done()
+                QtWidgets.QApplication.processEvents() # update text
+
+            QtWidgets.QApplication.processEvents() # update interface
+            
+            
+        # re enable editing in text boxes
         self.toggle_text_boxes(True)
+        
+        self.stackedWidget.setCurrentIndex(0)
+        self.status_label.setText('Preparing...') # Set for next time
+        
+        if self.runs_left == 0 and self.reset_ident:
+            self._start_tor_instance_async() # start new tor instance in background
 
 
+    def return_error_msgbox(self, msg):
+        self.status_queue.put_nowait(msg)
+        self.status_queue.join()
+        self.runs_left = 0
+        self.stackedWidget.setCurrentIndex(0)
+        QtWidgets.QApplication.processEvents()
 
-    def random_str(self, char_len):
-        return ''.join(chr(randint(97, 122)) for _ in range(char_len))
+    
+    tor_cmd = resource_path('Tor\\tor.exe')
+    
+    runs_left   = 0
+    token       = None
+    reset_ident = False    
+    starting_tor_instance = Queue()
+    
+    def _start_tor_instance_async(self):
+        t = Thread(target=self.start_tor_instance)
+        t.daemon = True
+        t.start()
+    
+    def start_tor_instance(self, set_reset_ident=False):
+        self.starting_tor_instance.put('start')
+        self.tr = TorRequest(tor_cmd=self.tor_cmd)
+        self.reset_ident = set_reset_ident
+        self.starting_tor_instance.get()
+        self.starting_tor_instance.task_done()
+        
 
 
     def run(self, amount):
         original_amount = amount
-        self.status_message = 'Preparing...'
 
-        self.reset_ident = False
-
-        os.chdir(os.path.join(self.folder, "Tor"))
-        tr = TorRequest()
-        tr.session.proxies.update({'https': 'socks5h://localhost:9050'})
+        if not self.starting_tor_instance.empty():
+            self.status_queue.put_nowait('Starting TOR instance...')
+            self.starting_tor_instance.join()
 
         while amount > 0:
             # create account
             if self.runs_left == 0:
                 if self.reset_ident:
-                    self.status_message = 'Resetting TOR Identity...'
-                    tr = TorRequest()
-                    # tr.reset_identity()       No longer needed because tr = TorRequest() resets IP
-                self.reset_ident = True
-                self.status_message = 'Registering new account over TOR...'
-                passwrd = self.random_str(15)
-                create_acc = tr.post('https://api.shortlyai.com/auth/register/', data={
-                    "email": f"{self.random_str(randint(8, 12))}{str(randint(0, 999)).rjust(3, '0')}@{self.random_str(10)}.com",
-                    "password1": passwrd,
-                    "password2": passwrd,
-                    "first_name": self.random_str(randint(8, 15)),
-                    "last_name": self.random_str(randint(8, 15))
+                    self.status_queue.put_nowait('Resetting TOR Identity...')
+                    self.start_tor_instance(set_reset_ident=True)
+                self.status_queue.put_nowait('Registering new account over TOR...')
+                passwrd = random_str(15)
+                create_acc = self.tr.post('https://api.shortlyai.com/auth/register/', data={
+                    "email":      f"{random_str(randint(8, 12))}{str(randint(0, 999)).rjust(3, '0')}@{random_str(10)}.com",
+                    "password1":  passwrd,
+                    "password2":  passwrd,
+                    "first_name": random_str(randint(8, 15)),
+                    "last_name":  random_str(randint(8, 15))
                 }).json()
-                self.runs_left = 4
-                self.token = create_acc['token']
-                # print(self.token) # debug: prints account token
+                if create_acc.get('token'):
+                    self.runs_left = 4
+                    self.token = create_acc['token']
+                else:
+                    self.return_error_msgbox('Error: Could not register account')
+                    return
 
             # generate
             for _ in range(min(amount, 4)):
-                self.status_message = f'Generating text... (part {(original_amount - amount) + 1}/{original_amount})'
+                self.status_queue.put_nowait('Generating text...'+ (
+                    f' (run {(original_amount - amount) + 1}/{original_amount})'
+                    if (original_amount-amount, original_amount) != (0, 1)
+                    else ''
+                ))
                 data = {
                     "ai_instructions": None,
                     "content": self.content.toPlainText(),
@@ -147,49 +232,44 @@ class UI(QMainWindow):
                     "story_background": self.story_background.toPlainText().strip(),
                     "Authorization": f"JWT {self.token}",
                 }
-                headers = {
-                    "Accept": "application/json, text/plain, */*",
-                    "Accept-Encoding": "gzip, deflate, br",
-                    "Accept-Language": "en-US,en;q=0.5",
-                    "Authorization": f"JWT {self.token}",
-                    "Connection": "keep-alive",
-                    "Content-Length": str(len(json.dumps(data))),
-                    "Content-Type": "application/json;charset=utf-8",
-                    "Host": "api.shortlyai.com",
-                    "Origin": "https://shortlyai.com",
-                    "Referer": "https://shortlyai.com/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0",
-                }
+                headers["Authorization"]    = f"JWT {self.token}"
+                headers["Content-Length"]   = str(len(json.dumps(data)))
+                
                 try:
-                    resp = tr.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data)).json()
+                    resp = self.tr.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data)).json()
                 except:
-                    self.status_message = 'Error: Could not connect to TOR'
-                    time.sleep(2)
-                    continue
+                    self.return_error_msgbox('Error: Could not connect to TOR')
+                    return
 
                 self.runs_left -= 1
                 amount -= 1
 
                 # error
-                if not 'text' in resp:
-                    self.status_message = 'Error: Could not scrape output'
-                    time.sleep(2)
-                    continue
+                if 'text' not in resp:
+                    self.return_error_msgbox('Error: Could not find output')
+                    return
 
                 # set text
                 if self.content.toPlainText().strip() == '':
                     resp['text'] = resp['text'].lstrip()
-                self.content.setPlainText(self.content.toPlainText()+resp['text'])
 
-        self.stackedWidget.setCurrentIndex(0)
-        QtWidgets.QApplication.processEvents()
+                self.content_queue.put_nowait(resp['text'])
+                self.content_queue.join()              
 
 
     def set_essay_background_placeholders(self):
         if self.article_check.isChecked():
-            self.story_background.setPlaceholderText('Article Brief:\nProvide the AI with a brief of what you are writing about for better output. Describe it like you are speaking to a friend.')
+            self.story_background.setPlaceholderText(
+                'Article Brief:\n'
+                'Provide the AI with a brief of what you are writing about for better output. '
+                'Describe it like you are speaking to a friend.'
+            )
         elif self.story_check.isChecked():
-            self.story_background.setPlaceholderText('Story Background:\nTell the AI about the current story setting and characters for better output. Describe it like you are speaking to a friend.')
+            self.story_background.setPlaceholderText(
+                'Story Background:\n'
+                'Tell the AI about the current story setting and characters for better output. '
+                'Describe it like you are speaking to a friend.'
+            )
 
 
     def set_line_color(self, brush, lines: list):
@@ -262,9 +342,8 @@ else:
     dark_mode = False
 
 # fonts
-fonts_folder = os.path.join(os.path.dirname(sys.argv[0]), 'fonts')
-QtGui.QFontDatabase.addApplicationFont(os.path.join(fonts_folder, 'Poppins-Medium.ttf'))
-QtGui.QFontDatabase.addApplicationFont(os.path.join(fonts_folder, 'Poppins-Regular.ttf'))
+QtGui.QFontDatabase.addApplicationFont(resource_path('fonts\\Poppins-Medium.ttf'))
+QtGui.QFontDatabase.addApplicationFont(resource_path('fonts\\Poppins-Regular.ttf'))
 
 
 MainWindow = QtWidgets.QMainWindow()

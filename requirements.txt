@@ -14,5 +14,4 @@ qt5-applications==5.15.2.2.1
 qt5-tools==5.15.2.1.0.1
 requests==2.25.1
 stem==1.8.0
-torrequest==0.1.0
 urllib3==1.26.4
