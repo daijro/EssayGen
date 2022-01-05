@@ -15,7 +15,7 @@ To run from source code, install the requirements:
 ```
 pip3 install -r requirements.txt
 ```
-(Tested on Python 3.8.5)
+(Tested on [Python 3.8.9](https://www.python.org/downloads/release/python-389/))
 
 
 <hr width=50>
