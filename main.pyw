@@ -15,7 +15,7 @@ root.withdraw()
 
 headers = {
     "Accept":           "application/json, text/plain, */*",
-    "Accept-Encoding":  "gzip, deflate, br",
+    # "Accept-Encoding":  "gzip, deflate, br",
     "Accept-Language":  "en-US,en;q=0.5",
     "Authorization":    None,         # placeholder
     "Connection":       "keep-alive",
@@ -238,7 +238,7 @@ class UI(QMainWindow):
                 try:
                     resp = self.tr.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data)).json()
                 except:
-                    self.return_error_msgbox('Error: Could not connect to TOR')
+                    self.return_error_msgbox('Error: Could not generate text')
                     return
 
                 self.runs_left -= 1
