@@ -7,6 +7,7 @@ from queue import Queue, Empty
 from random import randint
 from torrequest_fix import TorRequest
 import json
+import re
 from tkinter import messagebox
 import tkinter as tk
 
@@ -26,6 +27,14 @@ headers = {
     "Referer":          "https://shortlyai.com/",
     "User-Agent":       "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0",
 }
+
+special_commands = {
+    'instruct':  200,
+    'rewrite':   160,
+    'shorten':   200,
+    'expand':    120,
+}
+
 
 random_str = lambda char_len: ''.join(chr(randint(97, 122)) for _ in range(char_len))
 
@@ -73,17 +82,28 @@ class UI(QMainWindow):
         self.story_check.toggled.connect(lambda: self.set_essay_background_placeholders())
 
         self.set_essay_background_placeholders()
-        
         self._start_tor_instance_async()
         
         # show ui
         self.show()
         
-    
+                
     def toggle_text_boxes(self, toggle):
         self.content.setReadOnly(not toggle)
         self.story_background.setReadOnly(not toggle)
         self.topic.setReadOnly(not toggle)
+        
+
+    def format_content_data(self, special_command_list):
+        content_input = self.content.toPlainText()
+        cmd_type, cmd, text = special_command_list
+        cmd_index = content_input.find(cmd)
+        return [
+            cmd_type, # command type
+            text, # command text
+            content_input[max(0, cmd_index - 300):cmd_index + len(cmd) + 300].replace(cmd, text), # context w/300 char margin
+            content_input.replace(cmd, '') # content (remove command)
+        ]
 
 
     status_queue    = Queue()
@@ -102,13 +122,28 @@ class UI(QMainWindow):
             messagebox.showerror('EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
             return
 
+        # check for special commands
+        special_runs = []
+        
+        for cmd_type, charlimit in special_commands.items():
+            cmds = re.findall('/'+cmd_type+'\\ \\[[^\n]+\\]', self.content.toPlainText())
+            for cmd in cmds:
+                # remove /command [] using re
+                cmd_text = cmd[len(cmd_type)+3:-1]
+                if len(cmd_text) > charlimit:
+                    messagebox.showerror('EssayGen - Input Error', f'The {cmd_type} command cannot exceed {charlimit} characters. Please try again.')
+                    return
+                special_runs.append((cmd_type, cmd, cmd_text))
+        if special_runs:
+            amount = len(special_runs)
+        
         # disable editing in text boxes
         self.toggle_text_boxes(False)
         self.stackedWidget.setCurrentIndex(1)
         QtWidgets.QApplication.processEvents()
         
         # start thread
-        t = Thread(target=self.run, args=(amount,))
+        t = Thread(target=self.run, args=(amount, special_runs))
         t.daemon = True
         t.start()
 
@@ -118,19 +153,30 @@ class UI(QMainWindow):
             except Empty:
                 pass
             else:
-                self.status_label.setText(status_message)
                 # show error messages
                 if status_message.startswith('Error:'):
-                    messagebox.showerror('EssayGen - Run error', status_message+'.')
+                    messagebox.showerror('EssayGen - Run error', status_message)
+                    self.status_label.setText(status_message.split('.')[0]) # first sentence
+                else:
+                    self.status_label.setText(status_message)
                 self.status_queue.task_done()
             try: # check content_queue
-                content = self.content_queue.get(timeout=0.01)
+                content, cmd = self.content_queue.get(timeout=0.01)
             except Empty:
                 pass
             else:
-                scrollval = self.scrollbar.value()
-                self.content.setPlainText(self.content.toPlainText()+content) # set text
+                scrollval   = self.scrollbar.value()
+                scrollmax   = self.scrollbar.maximum()
+                old_content = self.content.toPlainText()
 
+                if cmd:
+                    cmd_pos_start = old_content.find(cmd)
+                    cmd_pos_end   = cmd_pos_start + len(cmd)
+                    self.content.setPlainText(old_content[:cmd_pos_start] +content+ old_content[cmd_pos_end:]) # set text
+                    self.content.textCursor().setPosition(cmd_pos_start + len(content))
+                else:
+                    self.content.textCursor().insertText(content)
+            
                 # not sure why it needs to be ran twice, possibly a PyQt bug
                 self.scrollbar.setValue(scrollval)
                 self.scrollbar.setValue(scrollval)
@@ -146,7 +192,7 @@ class UI(QMainWindow):
         self.stackedWidget.setCurrentIndex(0)
         self.status_label.setText('Preparing...') # Set for next time
         
-        if self.runs_left == 0 and self.reset_ident:
+        if not self.runs_left and self.reset_ident:
             self._start_tor_instance_async() # start new tor instance in background
 
 
@@ -171,19 +217,24 @@ class UI(QMainWindow):
         t.start()
     
     def start_tor_instance(self, set_reset_ident=False):
-        self.starting_tor_instance.put('start')
+        print('Tor instance starting')
         self.tr = TorRequest(tor_cmd=self.tor_cmd)
+        print(self.tr)
         self.reset_ident = set_reset_ident
-        self.starting_tor_instance.get()
-        self.starting_tor_instance.task_done()
+        self.starting_tor_instance.put('_')
         
 
-    def run(self, amount):
+    def run(self, amount, special_runs=[]):
         original_amount = amount
 
-        if not self.starting_tor_instance.empty():
+        if self.starting_tor_instance.empty():
             self.status_queue.put_nowait('Starting TOR instance...')
-            self.starting_tor_instance.join()
+            try:
+                self.starting_tor_instance.get(timeout=10)
+            except Empty:
+                self.return_error_msgbox('Error: TOR instance failed to start')
+                return
+            
 
         while amount > 0:
             # create account
@@ -214,17 +265,17 @@ class UI(QMainWindow):
                     if (original_amount-amount, original_amount) != (0, 1)
                     else ''
                 ))
+                cpos            = self.content.textCursor().position()
+                content_input   = (self.content.toPlainText()[:self.content.textCursor().position()]
+                                   if cpos else self.content.toPlainText())
+                    
+                # create request
                 data = {
                     "ai_instructions": None,
-                    "content": self.content.toPlainText(),
-                    "document_type": (
-                        "article" if self.article_check.isChecked()
-                        else (
-                            "story" if self.story_check.isChecked()
-                            else None
-                        )
-                    ),
-                    "is_command": False,
+                    "content": self.format_content_data(special_runs[original_amount-amount])
+                        if special_runs else content_input,
+                    "document_type": "article" if self.article_check.isChecked() else "story",
+                    "is_command": bool(special_runs),
                     "output_length": self.output_len_slider.value(),
                     "prompt": self.topic.text().strip(),
                     "story_background": self.story_background.toPlainText().strip(),
@@ -235,24 +286,30 @@ class UI(QMainWindow):
                 
                 try:
                     resp = self.tr.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data)).json()
-                except:
-                    self.return_error_msgbox('Error: Could not generate text')
+                except Exception as e:
+                    self.return_error_msgbox(f'Error: Could not generate text. Error details are provided below\n{e}')
                     return
 
-                self.runs_left -= 1
-                amount -= 1
-
                 # error
-                if 'text' not in resp:
-                    self.return_error_msgbox('Error: Could not find output')
+                if not resp.get('text'):
+                    if 'message' in resp:
+                        self.return_error_msgbox(f'Error: {resp["message"]}')
+                    else:
+                        self.return_error_msgbox('Error: Could not find output')
                     return
 
                 # set text
-                if self.content.toPlainText().strip() == '':
+                if not self.content.toPlainText().strip() or special_runs:
                     resp['text'] = resp['text'].lstrip()
+                    
+                self.content_queue.put_nowait((
+                    resp['text'],
+                    special_runs[original_amount-amount][1] if special_runs else ''
+                ))
+                self.content_queue.join()
 
-                self.content_queue.put_nowait(resp['text'])
-                self.content_queue.join()              
+                self.runs_left  -= 1
+                amount          -= 1
 
 
     def set_essay_background_placeholders(self):
