@@ -17,7 +17,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>EssayGen v1.3.0-beta</string>
+   <string>EssayGen v1.3.0</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="font">

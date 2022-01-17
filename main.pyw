@@ -16,7 +16,6 @@ root.withdraw()
 
 headers = {
     "Accept":           "application/json, text/plain, */*",
-    # "Accept-Encoding":  "gzip, deflate, br",
     "Accept-Language":  "en-US,en;q=0.5",
     "Authorization":    None,         # placeholder
     "Connection":       "keep-alive",
@@ -93,11 +92,25 @@ class UI(QMainWindow):
         self.story_background.setReadOnly(not toggle)
         self.topic.setReadOnly(not toggle)
         
+    
+    def _cut_off_context(self, text, index):
+        # use /// to cut off context relative to a given index
+        c1, c2 = text[:index].rfind('///'), text[index:].find('///')
+        return text[(None if c1 == -1 else c1+3):(None if c2 == -1 else c2+index)]
+    
+        
+    def _get_content_nocommand(self):
+        cpos = self.content.textCursor().position()
+        content_input = self.content.toPlainText()[:cpos] if cpos else self.content.toPlainText()
+        if '///' in content_input: content_input = content_input[content_input.rfind('///')+3:]
+        return content_input    
+    
 
     def format_content_data(self, special_command_list):
         content_input = self.content.toPlainText()
         cmd_type, cmd, text = special_command_list
         cmd_index = content_input.find(cmd)
+        if '///' in content_input: content_input = self._cut_off_context(content_input, cmd_index)
         return [
             cmd_type, # command type
             text, # command text
@@ -166,7 +179,6 @@ class UI(QMainWindow):
                 pass
             else:
                 scrollval   = self.scrollbar.value()
-                scrollmax   = self.scrollbar.maximum()
                 old_content = self.content.toPlainText()
 
                 if cmd:
@@ -217,9 +229,7 @@ class UI(QMainWindow):
         t.start()
     
     def start_tor_instance(self, set_reset_ident=False):
-        print('Tor instance starting')
         self.tr = TorRequest(tor_cmd=self.tor_cmd)
-        print(self.tr)
         self.reset_ident = set_reset_ident
         self.starting_tor_instance.put('_')
         
@@ -265,15 +275,12 @@ class UI(QMainWindow):
                     if (original_amount-amount, original_amount) != (0, 1)
                     else ''
                 ))
-                cpos            = self.content.textCursor().position()
-                content_input   = (self.content.toPlainText()[:self.content.textCursor().position()]
-                                   if cpos else self.content.toPlainText())
                     
                 # create request
                 data = {
                     "ai_instructions": None,
                     "content": self.format_content_data(special_runs[original_amount-amount])
-                        if special_runs else content_input,
+                        if special_runs else self._get_content_nocommand(),
                     "document_type": "article" if self.article_check.isChecked() else "story",
                     "is_command": bool(special_runs),
                     "output_length": self.output_len_slider.value(),
