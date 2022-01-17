@@ -123,23 +123,22 @@ class UI(QMainWindow):
     content_queue   = Queue()
 
     def run_thread(self, amount):
-        topic = self.topic.text().strip()
+        topic    = self.topic.text().strip()
+        content  = self.content.toPlainText().strip()
+        story_bg = self.story_background.toPlainText().strip()
 
         # check inputs for errors
-        if not any([topic,
-                    self.story_background.toPlainText().strip(),
-                    self.content.toPlainText().strip()]):
+        if not any([topic, story_bg, content]):
             messagebox.showerror('EssayGen - Input Error', 'Please enter text in at least one field.')
             return
-        elif len(self.story_background.toPlainText().strip()) > 500:
+        elif len(story_bg) > 500:
             messagebox.showerror('EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
             return
 
         # check for special commands
         special_runs = []
-        
         for cmd_type, charlimit in special_commands.items():
-            cmds = re.findall('/'+cmd_type+'\\ \\[[^\n]+\\]', self.content.toPlainText())
+            cmds = re.findall('/'+cmd_type+'\\ \\[[^\n]+\\]', content, flags=re.IGNORECASE)
             for cmd in cmds:
                 # remove /command [] using re
                 cmd_text = cmd[len(cmd_type)+3:-1]
