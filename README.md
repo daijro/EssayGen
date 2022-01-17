@@ -27,9 +27,33 @@ pip3 install -r requirements.txt
 - Enter the starting content of your essay
 - (optional) Enter a brief overview of your essay
 - Choose the length of each generated segment using the slider
+- Move your text cursor to where you want the AI to write text
 - Click "Generate" to run
 
-#### Screenshot:
+
+#### Effectively using GPT-3
+
+To find more tips on how to effectly make use of GPT-3, you can visit the [ShortlyAI docs](https://help.shortlyai.com/), or go to [this video tutorial](https://www.youtube.com/watch?v=5bnN6PjhDUE).
+
+
+#### Supported Features
+
+- **Article writing** (non-fiction mode)
+- **Story writing** (creative fiction mode)
+- **Title** - Specify a essay title to influence the AI's output
+- **Article brief/story outline** - Specifiy an article outline/summary or a story background for the AI
+- **Slash commands**
+    - `/instruct [instructions]` - Use to give instructions on what the AI should write next *(e.g. write about...)*
+    - `/rewrite [text]` - Rewrites text in a unique way *(max 160 characters)*
+    - `/shorten [text]` - Shortens text to make it more concise *(max 200 characters)*
+    - `/expand [text]` - Extends and develops text *(max 120 characters)*
+- **`///` content seperators** - Isolates content to prevent earlier sections of your writing from influencing the AI's output. For example, if the content above is a list, but you no longer wish to to write in a list format, this can be helpful.
+
+
+
+<hr width=50>
+
+## Screenshot
 
 ![image](https://i.imgur.com/zh44vvv.png)
 
