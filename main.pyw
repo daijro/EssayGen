@@ -82,6 +82,7 @@ class UI(QMainWindow):
         QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+P'), self).activated.connect(lambda: self._command_shortcut('rewrite'))
         QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+['), self).activated.connect(lambda: self._command_shortcut('shorten'))
         QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+]'), self).activated.connect(lambda: self._command_shortcut('expand'))
+        QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+Shift+C'), self).activated.connect(lambda: self._show_writing_stats())
         
         self.article_check.toggled.connect(lambda: self.set_essay_background_placeholders())
         self.story_check.toggled.connect(lambda: self.set_essay_background_placeholders())
@@ -128,6 +129,23 @@ class UI(QMainWindow):
     status_queue    = Queue()
     content_queue   = Queue()
 
+    def _show_writing_stats(self):
+        content         = self.content.toPlainText().replace('\u2029', '\n')
+        selected_text   = self.content.textCursor().selectedText().replace('\u2029', '\n')
+        messagebox.showinfo(
+            'EssayGen - Writing Stats',
+            (
+                "Selected character count:\t" + str(len(selected_text)) +
+                "\nSelected chars (no spaces):\t" + str(len(re.sub(r'\s', '', selected_text))) +
+                "\nSelected word count:\t" + str(len(selected_text.split()))
+            ) if selected_text else (
+                "Character count:\t" + str(len(content)) +
+                "\nChars (no spaces):\t" + str(len(re.sub(r'\s', '', content))) +
+                "\nWord count:\t" + str(len(content.split()))
+            )
+        )
+        self.activateWindow()
+        
 
     def _command_shortcut(self, key='instruct'):
         cursor = self.content.textCursor()
@@ -138,8 +156,7 @@ class UI(QMainWindow):
             if key == 'instruct':
                 self.run_thread(self.amount_of_runs.value())
             return
-        
-        if self._over_charlimit(key, stripped) or '\u2029' in stripped:
+        elif '\u2029' in stripped:
             return
         
         cursor.beginEditBlock()
@@ -151,6 +168,9 @@ class UI(QMainWindow):
             selection.split(stripped)[-1]
         )
         cursor.endEditBlock()
+        
+        if self._over_charlimit(key, cmd, stripped):
+            return
         
         self.run_thread(self.amount_of_runs.value(), [(key, cmd, selection)])
         
@@ -167,9 +187,17 @@ class UI(QMainWindow):
         return nstring
                 
 
-    def _over_charlimit(self, cmd_type, cmd_text):
+    def _over_charlimit(self, cmd_type, cmd, cmd_text):
         if len(cmd_text) > special_commands[cmd_type]:
-            messagebox.showerror('EssayGen - Input Error', f'The {cmd_type} command cannot exceed {special_commands[cmd_type]} characters. Please try again.')
+            excess_chars = len(cmd_text) - special_commands[cmd_type]
+            if messagebox.askyesno('EssayGen - Input Error', f'The {cmd_type} command cannot exceed {special_commands[cmd_type]} characters. Would you like to highlight the excess {excess_chars} character{"s" if excess_chars != 1 else ""}?'):
+                cmd_pos = self.content.find(cmd) + len(cmd_type) + 3
+                cmd_end = cmd_pos + len(cmd_text)
+                cursor = self.content.textCursor()
+                cursor.setPosition(cmd_pos + special_commands[cmd_type], QtGui.QTextCursor.MoveAnchor)
+                cursor.setPosition(cmd_end, QtGui.QTextCursor.KeepAnchor)
+                self.content.setTextCursor(cursor)
+            self.activateWindow()
             return True
         
         
@@ -180,7 +208,7 @@ class UI(QMainWindow):
             for cmd in cmds:
                 # remove /command [] using re
                 cmd_text = cmd[len(cmd_type)+3:-1]
-                if self._over_charlimit(cmd_type, cmd_text):
+                if self._over_charlimit(cmd_type, cmd, cmd_text):
                     return
                 special_runs.append((cmd_type, cmd, cmd_text))
         return special_runs
@@ -194,9 +222,11 @@ class UI(QMainWindow):
         # check inputs for errors
         if not any([topic, story_bg, content]):
             messagebox.showerror('EssayGen - Input Error', 'Please enter text in at least one field.')
+            self.activateWindow()
             return
         elif len(story_bg) > 500:
             messagebox.showerror('EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
+            self.activateWindow()
             return
 
         # check for special commands
@@ -223,6 +253,7 @@ class UI(QMainWindow):
                 # show error messages
                 if status_message.startswith('Error:'):
                     messagebox.showerror('EssayGen - Run error', status_message)
+                    self.activateWindow()
                     self.status_label.setText(status_message.split('.')[0]) # first sentence
                 else:
                     self.status_label.setText(status_message)
