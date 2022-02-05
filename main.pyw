@@ -64,7 +64,6 @@ class UI(QMainWindow):
         self.article_check    = self.findChild(QtWidgets.QRadioButton, "radioButton")
         self.story_check      = self.findChild(QtWidgets.QRadioButton, "radioButton_2")
         self.output_len_slider = self.findChild(QtWidgets.QSlider, "horizontalSlider")
-        self.scrollbar        = self.content.verticalScrollBar()
 
         # dividers
         if dark_mode:
@@ -135,13 +134,13 @@ class UI(QMainWindow):
         messagebox.showinfo(
             'EssayGen - Writing Stats',
             (
-                "Selected character count:\t" + str(len(selected_text)) +
-                "\nSelected chars (no spaces):\t" + str(len(re.sub(r'\s', '', selected_text))) +
-                "\nSelected word count:\t" + str(len(selected_text.split()))
+                "Selected character count:\t  "     + str(len(selected_text)) +
+                "\nSelected chars (no spaces):\t  " + str(len(re.sub(r'\s', '', selected_text))) +
+                "\nSelected word count:\t  "        + str(len(selected_text.split()))
             ) if selected_text else (
-                "Character count:\t" + str(len(content)) +
-                "\nChars (no spaces):\t" + str(len(re.sub(r'\s', '', content))) +
-                "\nWord count:\t" + str(len(content.split()))
+                "Character count:\t   "     + str(len(content)) +
+                "\nChars (no spaces):\t   " + str(len(re.sub(r'\s', '', content))) +
+                "\nWord count:\t   "        + str(len(content.split()))
             )
         )
         self.activateWindow()
@@ -155,6 +154,9 @@ class UI(QMainWindow):
         if not stripped:
             if key == 'instruct':
                 self.run_thread(self.amount_of_runs.value())
+            return
+        elif re.match(f'/({"|".join(special_commands.keys())})\\ \\[.*\\]', stripped):
+            self.run_thread(self.amount_of_runs.value())
             return
         elif '\u2029' in stripped:
             return
@@ -263,7 +265,7 @@ class UI(QMainWindow):
             except Empty:
                 pass
             else:
-                scrollval   = self.scrollbar.value()
+                scrollval   = self.content.verticalScrollBar().value()
                 old_content = self.content.toPlainText()
 
                 cursor = self.content.textCursor()
@@ -282,9 +284,9 @@ class UI(QMainWindow):
                 self.content.textCursor().insertText(content)
                 cursor.endEditBlock()
                 
-                # not sure why it needs to be ran twice, possibly a PyQt bug
-                self.scrollbar.setValue(scrollval)
-                self.scrollbar.setValue(scrollval)
+                scrollbar = QtWidgets.QScrollBar()
+                scrollbar.setValue(scrollval)
+                self.content.setVerticalScrollBar(scrollbar)
 
                 self.content_queue.task_done()
 
