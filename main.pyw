@@ -76,7 +76,13 @@ class UI(QMainWindow):
             
 
         # set connections
-        self.generate.clicked.connect(lambda: self.run_thread(self.amount_of_runs.value()))
+        self.generate.clicked.connect(lambda: self._command_shortcut())
+        
+        QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+Return'), self).activated.connect(lambda: self._command_shortcut())
+        QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+P'), self).activated.connect(lambda: self._command_shortcut('rewrite'))
+        QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+['), self).activated.connect(lambda: self._command_shortcut('shorten'))
+        QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+]'), self).activated.connect(lambda: self._command_shortcut('expand'))
+        
         self.article_check.toggled.connect(lambda: self.set_essay_background_placeholders())
         self.story_check.toggled.connect(lambda: self.set_essay_background_placeholders())
 
@@ -122,7 +128,65 @@ class UI(QMainWindow):
     status_queue    = Queue()
     content_queue   = Queue()
 
-    def run_thread(self, amount):
+
+    def _command_shortcut(self, key='instruct'):
+        cursor = self.content.textCursor()
+        selection = cursor.selectedText()
+        stripped = self._multistrip(selection)
+        
+        if not stripped:
+            if key == 'instruct':
+                self.run_thread(self.amount_of_runs.value())
+            return
+        
+        if self._over_charlimit(key, stripped) or '\u2029' in stripped:
+            return
+        
+        cursor.beginEditBlock()
+        cmd = f'/{key} [{stripped}]'
+        cursor.removeSelectedText()
+        cursor.insertText(
+            selection.split(stripped)[0]
+            + cmd +
+            selection.split(stripped)[-1]
+        )
+        cursor.endEditBlock()
+        
+        self.run_thread(self.amount_of_runs.value(), [(key, cmd, selection)])
+        
+
+    def _multistrip(self, string):
+        # strip mutliple characters from the start of a string
+        nstring = string
+        for s in string:
+            if s in ' \n\t\r,.;:!?\u2029': nstring = nstring[1:]
+            else: break
+        for s in string[::-1]:
+            if s in ' \n\t\r\u2029': nstring = nstring[:-1]
+            else: break
+        return nstring
+                
+
+    def _over_charlimit(self, cmd_type, cmd_text):
+        if len(cmd_text) > special_commands[cmd_type]:
+            messagebox.showerror('EssayGen - Input Error', f'The {cmd_type} command cannot exceed {special_commands[cmd_type]} characters. Please try again.')
+            return True
+        
+        
+    def _check_for_commands(self, content):
+        special_runs = []
+        for cmd_type in special_commands:
+            cmds = re.findall('/'+cmd_type+'\\ \\[[^\n\u2029]+\\]', content, flags=re.IGNORECASE)
+            for cmd in cmds:
+                # remove /command [] using re
+                cmd_text = cmd[len(cmd_type)+3:-1]
+                if self._over_charlimit(cmd_type, cmd_text):
+                    return
+                special_runs.append((cmd_type, cmd, cmd_text))
+        return special_runs
+
+
+    def run_thread(self, amount, shortcut_command=False):
         topic    = self.topic.text().strip()
         content  = self.content.toPlainText().strip()
         story_bg = self.story_background.toPlainText().strip()
@@ -136,16 +200,7 @@ class UI(QMainWindow):
             return
 
         # check for special commands
-        special_runs = []
-        for cmd_type, charlimit in special_commands.items():
-            cmds = re.findall('/'+cmd_type+'\\ \\[[^\n]+\\]', content, flags=re.IGNORECASE)
-            for cmd in cmds:
-                # remove /command [] using re
-                cmd_text = cmd[len(cmd_type)+3:-1]
-                if len(cmd_text) > charlimit:
-                    messagebox.showerror('EssayGen - Input Error', f'The {cmd_type} command cannot exceed {charlimit} characters. Please try again.')
-                    return
-                special_runs.append((cmd_type, cmd, cmd_text))
+        special_runs = shortcut_command or self._check_for_commands(content)
         if special_runs:
             amount = len(special_runs)
         
@@ -180,14 +235,22 @@ class UI(QMainWindow):
                 scrollval   = self.scrollbar.value()
                 old_content = self.content.toPlainText()
 
+                cursor = self.content.textCursor()
+                # new editing block
+                cursor.beginEditBlock()
+                
                 if cmd:
                     cmd_pos_start = old_content.find(cmd)
                     cmd_pos_end   = cmd_pos_start + len(cmd)
-                    self.content.setPlainText(old_content[:cmd_pos_start] +content+ old_content[cmd_pos_end:]) # set text
-                    self.content.textCursor().setPosition(cmd_pos_start + len(content))
-                else:
-                    self.content.textCursor().insertText(content)
-            
+                    
+                    # remove the command
+                    cursor.setPosition(cmd_pos_start, QtGui.QTextCursor.MoveAnchor)
+                    cursor.setPosition(cmd_pos_end, QtGui.QTextCursor.KeepAnchor)
+                    cursor.removeSelectedText()
+                    
+                self.content.textCursor().insertText(content)
+                cursor.endEditBlock()
+                
                 # not sure why it needs to be ran twice, possibly a PyQt bug
                 self.scrollbar.setValue(scrollval)
                 self.scrollbar.setValue(scrollval)
@@ -195,7 +258,6 @@ class UI(QMainWindow):
                 self.content_queue.task_done()
 
             QtWidgets.QApplication.processEvents() # update interface
-            
             
         # re enable editing in text boxes
         self.toggle_text_boxes(True)
@@ -222,15 +284,19 @@ class UI(QMainWindow):
     reset_ident = False    
     starting_tor_instance = Queue()
     
+    
     def _start_tor_instance_async(self):
         t = Thread(target=self.start_tor_instance)
         t.daemon = True
         t.start()
     
     def start_tor_instance(self, set_reset_ident=False):
+        # update title bar
+        self.setWindowTitle('EssayGen v1.4.0 - Processing...')
         self.tr = TorRequest(tor_cmd=self.tor_cmd)
         self.reset_ident = set_reset_ident
         self.starting_tor_instance.put('_')
+        self.setWindowTitle('EssayGen v1.4.0')
         
 
     def run(self, amount, special_runs=[]):
@@ -244,7 +310,6 @@ class UI(QMainWindow):
                 self.return_error_msgbox('Error: TOR instance failed to start')
                 return
             
-
         while amount > 0:
             # create account
             if self.runs_left == 0:
