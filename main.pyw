@@ -322,12 +322,9 @@ class UI(QMainWindow):
         t.start()
     
     def start_tor_instance(self, set_reset_ident=False):
-        # update title bar
-        self.setWindowTitle('EssayGen v1.4.0 - Processing...')
         self.tr = TorRequest(tor_cmd=self.tor_cmd)
         self.reset_ident = set_reset_ident
         self.starting_tor_instance.put('_')
-        self.setWindowTitle('EssayGen v1.4.0')
         
 
     def run(self, amount, special_runs=[]):
