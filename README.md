@@ -44,12 +44,12 @@ To find more tips on how to effectly make use of GPT-3, you can visit the [Short
 - **Article brief/story outline** - Specifiy an article outline/summary or a story background for the AI
 - **[Slash commands](https://help.shortlyai.com/getting-started/slash-commands)**
     
-| Command                    	| Description                                                                       	| Hotkey     	|  Char Limit 	|
-|----------------------------	|-----------------------------------------------------------------------------------	|------------	| ------------	|
-| *`/instruct [instructions]`* 	| Give instructions on what the AI should write next. [More details](https://help.shortlyai.com/getting-started/slash-commands#instruct)	| Ctrl+Enter 	|  500        	|
-| *`/rewrite [text]`*          	| Rewrites text in a unique way                                                     	| Ctrl+P     	|  160        	|
-| *`/shorten [text]`*          	| Shortens text to make it more concise                                             	| Ctrl+[     	|  200        	|
-| *`/expand [text]`*           	| Extends and develops text                                                         	| Ctrl+]     	|  120        	|
+| Command                | Description                                                                       	| Hotkey     	|  Char Limit 	|
+|------------------------|-----------------------------------------------------------------------------------	|------------	| ------------	|
+| *`/instruct [text]`* 	 | Give instructions on what the AI should write next. [More details](https://help.shortlyai.com/getting-started/slash-commands#instruct)	| Ctrl+Enter 	|  500        	|
+| *`/rewrite [text]`*    | Rewrites text in a unique way                                                     	| Ctrl+P     	|  160        	|
+| *`/shorten [text]`*    | Shortens text to make it more concise                                             	| Ctrl+[     	|  200        	|
+| *`/expand [text]`*     | Extends and develops text                                                         	| Ctrl+]     	|  120        	|
 - **Writing stats**: Displays character count, char count (without spaces), and word count of either the selected text or entire text *(Ctrl+Shift+C)*
 
 - **[`///` content seperators](https://help.shortlyai.com/getting-started/understanding-context#using)** - Isolates content to prevent earlier sections of your writing from influencing the AI's output. For example, if the content above is a list, but you no longer wish to to write in a list format, this can be helpful.
