@@ -145,8 +145,10 @@ class UI(QMainWindow):
         )
         self.activateWindow()
         
-
+    _running = False
     def _command_shortcut(self, key='instruct'):
+        if self._running:
+            return
         cursor = self.content.textCursor()
         selection = cursor.selectedText()
         stripped = self._multistrip(selection)
@@ -155,10 +157,17 @@ class UI(QMainWindow):
             if key == 'instruct':
                 self.run_thread(self.amount_of_runs.value())
             return
-        elif re.match(f'/({"|".join(special_commands.keys())})\\ \\[.*\\]', stripped):
-            self.run_thread(self.amount_of_runs.value())
+        elif re.search(f'/({"|".join(special_commands.keys())})'+'\\ \\[[^\n\u2029]+\\]', stripped, flags=re.IGNORECASE):
+            if messagebox.askyesno('EssayGen - Error', 'Commands cannot be nested. Would you like to run the selected commands instead?'):
+                nested_commands = self._check_for_commands(stripped, self.content.toPlainText())
+                if nested_commands == 1:
+                    return
+                self.run_thread(self.amount_of_runs.value(), nested_commands)
+            self.activateWindow()
             return
-        elif '\u2029' in stripped:
+        elif '\u2029' in stripped or '\n' in stripped:
+            messagebox.showerror('EssayGen - Error', 'Commands can not contain line breaks.')
+            self.activateWindow()
             return
         
         cursor.beginEditBlock()
@@ -174,7 +183,9 @@ class UI(QMainWindow):
         if self._over_charlimit(key, cmd, stripped):
             return
         
+        self._running = True
         self.run_thread(self.amount_of_runs.value(), [(key, cmd, selection)])
+        self._running = False
         
 
     def _multistrip(self, string):
@@ -193,7 +204,7 @@ class UI(QMainWindow):
         if len(cmd_text) > special_commands[cmd_type]:
             excess_chars = len(cmd_text) - special_commands[cmd_type]
             if messagebox.askyesno('EssayGen - Input Error', f'The {cmd_type} command cannot exceed {special_commands[cmd_type]} characters. Would you like to highlight the excess {excess_chars} character{"s" if excess_chars != 1 else ""}?'):
-                cmd_pos = self.content.find(cmd) + len(cmd_type) + 3
+                cmd_pos = self.content.toPlainText().find(cmd) + len(cmd_type) + 3
                 cmd_end = cmd_pos + len(cmd_text)
                 cursor = self.content.textCursor()
                 cursor.setPosition(cmd_pos + special_commands[cmd_type], QtGui.QTextCursor.MoveAnchor)
@@ -203,7 +214,8 @@ class UI(QMainWindow):
             return True
         
         
-    def _check_for_commands(self, content):
+    def _check_for_commands(self, content, full_content=None):
+        _multi_run_warning = True
         special_runs = []
         for cmd_type in special_commands:
             cmds = re.findall('/'+cmd_type+'\\ \\[[^\n\u2029]+\\]', content, flags=re.IGNORECASE)
@@ -211,7 +223,18 @@ class UI(QMainWindow):
                 # remove /command [] using re
                 cmd_text = cmd[len(cmd_type)+3:-1]
                 if self._over_charlimit(cmd_type, cmd, cmd_text):
-                    return
+                    return 1 # error
+                if (
+                    full_content
+                    and full_content.count(cmd) > 1
+                    and _multi_run_warning
+                ):
+                    warning = messagebox.askokcancel('EssayGen - Error', 'You cannot have multiple instances of the same command. Continuing will run the first instance in the text.')
+                    self.activateWindow()
+                    if warning:
+                        _multi_run_warning = False # only warn once
+                    else:
+                        return 1
                 special_runs.append((cmd_type, cmd, cmd_text))
         return special_runs
 
@@ -233,7 +256,9 @@ class UI(QMainWindow):
 
         # check for special commands
         special_runs = shortcut_command or self._check_for_commands(content)
-        if special_runs:
+        if special_runs == 1:
+            return
+        elif special_runs:
             amount = len(special_runs)
         
         # disable editing in text boxes
