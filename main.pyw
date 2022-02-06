@@ -394,7 +394,7 @@ class UI(QMainWindow):
             # generate
             for _ in range(min(amount, 4)):
                 self.status_queue.put_nowait('Generating text...'+ (
-                    f' (run {(original_amount - amount) + 1}/{original_amount})'
+                    f' ({"command" if special_runs else "run"} {(original_amount - amount) + 1}/{original_amount})'
                     if (original_amount-amount, original_amount) != (0, 1)
                     else ''
                 ))
