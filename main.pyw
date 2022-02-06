@@ -229,7 +229,7 @@ class UI(QMainWindow):
                     and full_content.count(cmd) > 1
                     and _multi_run_warning
                 ):
-                    warning = messagebox.askokcancel('EssayGen - Error', 'You cannot have multiple instances of the same command. Continuing will run the first instance in the text.')
+                    warning = messagebox.askokcancel('EssayGen - Error', 'You cannot have multiple instances of the same command. Continuing will ONLY run the first instance in the text.')
                     self.activateWindow()
                     if warning:
                         _multi_run_warning = False # only warn once
@@ -293,8 +293,8 @@ class UI(QMainWindow):
                 scrollval   = self.content.verticalScrollBar().value()
                 old_content = self.content.toPlainText()
 
+                # insert content using cursor
                 cursor = self.content.textCursor()
-                # new editing block
                 cursor.beginEditBlock()
                 
                 if cmd:
@@ -305,10 +305,14 @@ class UI(QMainWindow):
                     cursor.setPosition(cmd_pos_start, QtGui.QTextCursor.MoveAnchor)
                     cursor.setPosition(cmd_pos_end, QtGui.QTextCursor.KeepAnchor)
                     cursor.removeSelectedText()
+                    cursor.setPosition(cmd_pos_start)
                     
-                self.content.textCursor().insertText(content)
+                cursor.insertText(content)
                 cursor.endEditBlock()
+                # set text cursor
+                self.content.setTextCursor(cursor)
                 
+                # set text scrollbar to same position
                 scrollbar = QtWidgets.QScrollBar()
                 scrollbar.setValue(scrollval)
                 self.content.setVerticalScrollBar(scrollbar)
