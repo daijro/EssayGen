@@ -1,31 +1,43 @@
 from PyQt5.QtWidgets import QMainWindow, QApplication
-from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5 import uic
-import os, sys
-from threading import Thread
+from multiprocessing import Process, Queue as MPQueue
 from queue import Queue, Empty
-from random import randint
-from torrequest_fix import TorRequest
-import json
-import re
-from tkinter import messagebox
-import tkinter as tk
+import os, sys
 
-root = tk.Tk()
-root.withdraw()
+if __name__ == "__main__":
+    from PyQt5 import QtWidgets, QtGui, QtCore
+    from PyQt5 import uic
+    from threading import Thread
+    from random import randint
+    from torrequest_fix import TorRequest
+    import json
+    import re
+    from tkinter import messagebox
+    import tkinter as tk
+    
+    root = tk.Tk()
+    root.withdraw()
+    
+    headers = {
+        "Host": "api.shortlyai.com",
+        "Content-Length": None,
+        "Sec-Ch-Ua": "\"(Not(A:Brand\";v=\"8\", \"Chromium\";v=\"99\"",
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json;charset=UTF-8",
+        "Sec-Ch-Ua-Mobile": "?0",
+        "User-Agent": None,
+        "Sec-Ch-Ua-Platform": "\"Windows\"",
+        "Origin": "https://www.shortlyai.com",
+        "Sec-Fetch-Site": "same-site",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Dest": "empty",
+        "Referer": "https://www.shortlyai.com/",
+        "Accept-Encoding": "gzip, deflate",
+        "Accept-Language": "en-US,en;q=0.9"
+        }
 
-headers = {
-    "Accept":           "application/json, text/plain, */*",
-    "Accept-Language":  "en-US,en;q=0.5",
-    "Authorization":    None,         # placeholder
-    "Connection":       "keep-alive",
-    "Content-Length":   None,         # placeholder
-    "Content-Type":     "application/json;charset=utf-8",
-    "Host":             "api.shortlyai.com",
-    "Origin":           "https://shortlyai.com",
-    "Referer":          "https://shortlyai.com/",
-    "User-Agent":       "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0",
-}
+
+import cloudflare_solver
+
 
 special_commands = {
     'instruct':  200,
@@ -33,7 +45,6 @@ special_commands = {
     'shorten':   200,
     'expand':    120,
 }
-
 
 random_str = lambda char_len: ''.join(chr(randint(97, 122)) for _ in range(char_len))
 
@@ -353,19 +364,32 @@ class UI(QMainWindow):
         t.start()
     
     def start_tor_instance(self, set_reset_ident=False):
+        self.setWindowTitle('EssayGen v1.4.1-beta - Starting TOR Instance...')
         self.tr = TorRequest(tor_cmd=self.tor_cmd)
         self.reset_ident = set_reset_ident
-        self.starting_tor_instance.put('_')
+        self.setWindowTitle('EssayGen v1.4.1-beta - Running Cloudflare Challenge...')
+        q = MPQueue()
+        p = Process(target=cloudflare_solver.run, args=(q,))
+        p.daemon = True
+        p.start()
+        if h := q.get():
+            headers['User-Agent'] = h['headers']['User-Agent']
+            self.setWindowTitle('EssayGen v1.4.1-beta - Ready')
+            self.starting_tor_instance.put('_')
+        else:
+            os._exit(0)
+        p.terminate()
         
 
-    def run(self, amount, special_runs=[]):
+    def run(self, amount, special_runs=None):
         original_amount = amount
 
         if self.starting_tor_instance.empty():
-            self.status_queue.put_nowait('Starting TOR instance...')
+            self.status_queue.put_nowait('Processing...')
             try:
-                self.starting_tor_instance.get(timeout=10)
+                self.starting_tor_instance.get(timeout=100)
             except Empty:
+                self.setWindowTitle('EssayGen v1.4.1-beta - Failed')
                 self.return_error_msgbox('Error: TOR instance failed to start')
                 return
             
@@ -377,13 +401,15 @@ class UI(QMainWindow):
                     self.start_tor_instance(set_reset_ident=True)
                 self.status_queue.put_nowait('Registering new account over TOR...')
                 passwrd = random_str(15)
-                create_acc = self.tr.post('https://api.shortlyai.com/auth/register/', data={
+                data = {
                     "email":      f"{random_str(randint(8, 12))}{str(randint(0, 999)).rjust(3, '0')}@{random_str(10)}.com",
                     "password1":  passwrd,
                     "password2":  passwrd,
                     "first_name": random_str(randint(8, 15)),
                     "last_name":  random_str(randint(8, 15))
-                }).json()
+                }
+                headers['Content-Length'] = str(len(str(data)))
+                create_acc = self.tr.post('https://api.shortlyai.com/auth/register/', data=json.dumps(data), headers=headers).json()
                 if create_acc.get('token'):
                     self.runs_left = 4
                     self.token = create_acc['token']
@@ -497,41 +523,41 @@ def detect_darkmode_in_windows(): # automatically detect dark mode
     return False
 
 
-
-# initialize app
-app = QApplication(sys.argv)
-
-
-# dark mode palette ------------------------------
-app.setStyle('Fusion')
-
-light_palette = QtGui.QPalette()
-
-if detect_darkmode_in_windows():
-    dark_mode = True
-    dark_palette = QtGui.QPalette()
-    dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(25,35,45))
-    dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(39, 49, 58))
-    dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(25,35,45))
-    dark_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(25,35,45))
-    dark_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
-    dark_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.blue)
-    dark_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(20, 129, 216))
-    dark_palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
-    app.setPalette(dark_palette)
-else:
-    dark_mode = False
-
-# fonts
-QtGui.QFontDatabase.addApplicationFont(resource_path('fonts\\Poppins-Medium.ttf'))
-QtGui.QFontDatabase.addApplicationFont(resource_path('fonts\\Poppins-Regular.ttf'))
+if __name__ == "__main__":
+    # initialize app
+    app = QApplication(sys.argv)
 
 
-MainWindow = QtWidgets.QMainWindow()
+    # dark mode palette ------------------------------
+    app.setStyle('Fusion')
 
-window = UI()
-app.exec_()
+    light_palette = QtGui.QPalette()
+
+    if detect_darkmode_in_windows():
+        dark_mode = True
+        dark_palette = QtGui.QPalette()
+        dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(25,35,45))
+        dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
+        dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(39, 49, 58))
+        dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(25,35,45))
+        dark_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
+        dark_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
+        dark_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
+        dark_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(25,35,45))
+        dark_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
+        dark_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.blue)
+        dark_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(20, 129, 216))
+        dark_palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
+        app.setPalette(dark_palette)
+    else:
+        dark_mode = False
+
+    # fonts
+    QtGui.QFontDatabase.addApplicationFont(resource_path('fonts\\Poppins-Medium.ttf'))
+    QtGui.QFontDatabase.addApplicationFont(resource_path('fonts\\Poppins-Regular.ttf'))
+
+
+    MainWindow = QtWidgets.QMainWindow()
+
+    window = UI()
+    app.exec_()
