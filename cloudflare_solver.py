@@ -1,7 +1,6 @@
 from PyQt5 import QtGui, QtCore, QtWidgets, QtWebEngineWidgets
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.QtWebEngineCore import QWebEngineUrlRequestInterceptor
-from PyQt5.QtNetwork import QNetworkProxy
 import sys
 from bs4 import BeautifulSoup
 import os
@@ -106,12 +105,6 @@ def run(queue=None):
     q = queue
     app = QApplication(sys.argv)
     
-    proxy = QNetworkProxy()
-    proxy.setType(QNetworkProxy.Socks5Proxy)
-    proxy.setHostName('localhost')
-    proxy.setPort(9050)
-    QNetworkProxy.setApplicationProxy(proxy)
-    
     MainWindow = QtWidgets.QMainWindow()
     ui = UI()
     ui.setupUi()
@@ -120,9 +113,4 @@ def run(queue=None):
     
 if __name__ == "__main__":
     # DEBUGGING PURPOSES ONLY
-    # starts TOR proxy, resolves Cloudflare challenge, returns headers
-    from torrequest_fix import TorRequest
-    print('--starting socks5 tor proxy on port 9050--')
-    tr = TorRequest(tor_cmd = resource_path('Tor\\tor.exe'))
-    print('--started--')
     run()

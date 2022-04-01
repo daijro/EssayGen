@@ -8,7 +8,7 @@ if __name__ == "__main__":
     from PyQt5 import uic
     from threading import Thread
     from random import randint
-    from torrequest_fix import TorRequest
+    from requests import Session
     import json
     import re
     from tkinter import messagebox
@@ -350,8 +350,6 @@ class UI(QMainWindow):
         QtWidgets.QApplication.processEvents()
 
     
-    tor_cmd = resource_path('Tor\\tor.exe')
-    
     runs_left   = 0
     token       = None
     reset_ident = False    
@@ -364,8 +362,8 @@ class UI(QMainWindow):
         t.start()
     
     def start_tor_instance(self, set_reset_ident=False):
-        self.setWindowTitle('EssayGen v1.4.1-beta - Starting TOR Instance...')
-        self.tr = TorRequest(tor_cmd=self.tor_cmd)
+        self.setWindowTitle('EssayGen v1.4.1-beta - Starting session...')
+        self.tr = Session()
         self.reset_ident = set_reset_ident
         self.setWindowTitle('EssayGen v1.4.1-beta - Running Cloudflare Challenge...')
         q = MPQueue()
@@ -390,16 +388,16 @@ class UI(QMainWindow):
                 self.starting_tor_instance.get(timeout=100)
             except Empty:
                 self.setWindowTitle('EssayGen v1.4.1-beta - Failed')
-                self.return_error_msgbox('Error: TOR instance failed to start')
+                self.return_error_msgbox('Error: Failed to start')
                 return
             
         while amount > 0:
             # create account
             if self.runs_left == 0:
                 if self.reset_ident:
-                    self.status_queue.put_nowait('Resetting TOR Identity...')
+                    self.status_queue.put_nowait('Resetting session...')
                     self.start_tor_instance(set_reset_ident=True)
-                self.status_queue.put_nowait('Registering new account over TOR...')
+                self.status_queue.put_nowait('Registering new account...')
                 passwrd = random_str(15)
                 data = {
                     "email":      f"{random_str(randint(8, 12))}{str(randint(0, 999)).rjust(3, '0')}@{random_str(10)}.com",
