@@ -239,7 +239,7 @@
            <item row="0" column="0">
             <widget class="QLabel" name="label_2">
              <property name="text">
-              <string>Starting TOR instance...</string>
+              <string>Processing...</string>
              </property>
             </widget>
            </item>
