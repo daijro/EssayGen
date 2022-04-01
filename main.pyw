@@ -199,13 +199,12 @@ class UI(QMainWindow):
         self._running = False
         
 
-    def _multistrip(self, string):
+    def _multistrip(self, nstring):
         # strip mutliple characters from the start of a string
-        nstring = string
-        for s in string:
+        for s in nstring:
             if s in ' \n\t\r,.;:!?\u2029': nstring = nstring[1:]
             else: break
-        for s in string[::-1]:
+        for s in nstring[::-1]:
             if s in ' \n\t\r\u2029': nstring = nstring[:-1]
             else: break
         return nstring
@@ -371,7 +370,7 @@ class UI(QMainWindow):
         p.daemon = True
         p.start()
         if h := q.get():
-            headers['User-Agent'] = h['headers']['User-Agent']
+            headers['User-Agent'] = h
             self.setWindowTitle('EssayGen v1.4.1-beta - Ready')
             self.starting_tor_instance.put('_')
         else:

@@ -1,10 +1,7 @@
 from PyQt5 import QtGui, QtCore, QtWidgets, QtWebEngineWidgets
 from PyQt5.QtWidgets import QMainWindow, QApplication
-from PyQt5.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 import sys
-from bs4 import BeautifulSoup
 import os
-import json
 
 
 def resource_path(relative_path):
@@ -79,24 +76,13 @@ class WebViewer(QtWebEngineWidgets.QWebEngineView):
     
     
 class InstrumentedPage(QtWebEngineWidgets.QWebEnginePage):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.loadFinished.connect(self.handleLoadFinished)
-    
     def acceptNavigationRequest(self, url, _type, isMainFrame):
         if url.toString().startswith('https://www.shortlyai.com'):
-            self.load(QtCore.QUrl('https://httpbin.org/headers'))
-            
+            if q:
+                q.put_nowait(self.profile().httpUserAgent())
+            else:
+                self.load(QtCore.QUrl('https://httpbin.org/headers'))
         return super().acceptNavigationRequest(url, _type, isMainFrame)
-
-    def processCurrentPage(self, html):
-        url = self.url().toString()
-        if 'httpbin.org' in url and q:
-            q.put_nowait(json.loads(BeautifulSoup(html, features='lxml').text))
-
-    def handleLoadFinished(self):
-        self.toHtml(self.processCurrentPage)
-
 
 q = None
 
