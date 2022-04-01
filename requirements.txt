@@ -3,7 +3,6 @@ chardet==4.0.0
 click==8.0.1
 colorama==0.4.4
 idna==2.10
-lxml==4.8.0
 PyQt5==5.15.4
 pyqt5-plugins==5.15.4.2.1.0
 PyQt5-Qt5==5.15.2
