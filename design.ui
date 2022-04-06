@@ -247,8 +247,30 @@
          </widget>
         </widget>
        </item>
+       <item row="1" column="0" colspan="2">
+        <widget class="QTextEdit" name="content_field">
+         <property name="font">
+          <font>
+           <family>Poppins</family>
+           <pointsize>11</pointsize>
+          </font>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="tabChangesFocus">
+          <bool>true</bool>
+         </property>
+         <property name="acceptRichText">
+          <bool>false</bool>
+         </property>
+         <property name="placeholderText">
+          <string>Enter your starting text here</string>
+         </property>
+        </widget>
+       </item>
        <item row="1" column="2">
-        <widget class="QPlainTextEdit" name="plainTextEdit_2">
+        <widget class="QTextEdit" name="bg_field">
          <property name="maximumSize">
           <size>
            <width>300</width>
@@ -264,24 +286,11 @@
          <property name="frameShape">
           <enum>QFrame::NoFrame</enum>
          </property>
-         <property name="backgroundVisible">
+         <property name="tabChangesFocus">
+          <bool>true</bool>
+         </property>
+         <property name="acceptRichText">
           <bool>false</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0" colspan="2">
-        <widget class="QPlainTextEdit" name="plainTextEdit">
-         <property name="font">
-          <font>
-           <family>Poppins</family>
-           <pointsize>11</pointsize>
-          </font>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
-         </property>
-         <property name="placeholderText">
-          <string>Enter your starting content here</string>
          </property>
         </widget>
        </item>
@@ -293,8 +302,8 @@
  </widget>
  <tabstops>
   <tabstop>lineEdit</tabstop>
-  <tabstop>plainTextEdit</tabstop>
-  <tabstop>plainTextEdit_2</tabstop>
+  <tabstop>content_field</tabstop>
+  <tabstop>bg_field</tabstop>
   <tabstop>radioButton</tabstop>
   <tabstop>radioButton_2</tabstop>
   <tabstop>horizontalSlider</tabstop>
