@@ -265,7 +265,7 @@
           <bool>false</bool>
          </property>
          <property name="placeholderText">
-          <string>Enter your starting text here</string>
+          <string>Enter your starting content here</string>
          </property>
         </widget>
        </item>
