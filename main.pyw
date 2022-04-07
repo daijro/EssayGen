@@ -228,7 +228,7 @@ class UI(QMainWindow):
         _multi_run_warning = True
         special_runs = []
         for cmd_type in special_commands:
-            cmds = re.findall('/'+cmd_type+'\\ \\[[^\n\u2029]+\\]', content, flags=re.IGNORECASE)
+            cmds = re.findall(f'/{cmd_type}' + '\\ \\[[^\n\u2029]+\\]', content, flags=re.IGNORECASE)
             for cmd in cmds:
                 # remove /command [] using re
                 cmd_text = cmd[len(cmd_type)+3:-1]
@@ -393,10 +393,8 @@ class UI(QMainWindow):
         while amount > 0:
             # create account
             if self.runs_left == 0:
-                if self.reset_ident:
-                    self.status_queue.put_nowait('Resetting session...')
-                    self.start_tor_instance(set_reset_ident=True)
                 self.status_queue.put_nowait('Registering new account...')
+                self.sess.cookies.clear()
                 passwrd = random_str(15)
                 data = {
                     "email":      f"{random_str(randint(8, 12))}{str(randint(0, 999)).rjust(3, '0')}@{random_str(10)}.com",
@@ -502,22 +500,15 @@ class Highlighter(QSyntaxHighlighter):
     def __init__(self, parent=None):
         super(Highlighter, self).__init__(parent)
 
-        keywordFormat = QtGui.QTextCharFormat()
-        keywordFormat.setForeground(QtGui.QColor(200, 255, 200) if dark_mode else QtCore.Qt.darkGreen)
-        keywordFormat.setFontWeight(QtGui.QFont.DemiBold)
-
-        self.highlightingRules = [(
-            QtCore.QRegExp(f'/({"|".join(special_commands.keys())})'+'\\ \\[([^\n\u2029]+)?\\]'),
-            keywordFormat
-        )]
+        self.keywordFormat = QtGui.QTextCharFormat()
+        self.keywordFormat.setForeground(QtGui.QColor(200, 255, 200) if dark_mode else QtCore.Qt.darkGreen)
+        self.keywordFormat.setFontWeight(QtGui.QFont.DemiBold)
+        self._re_obj = re.compile(f'/({"|".join(special_commands.keys())})'+'\\ \\[([^\n\u2029]+)?\\]', flags=re.IGNORECASE)
         
     def highlightBlock(self, text):
-        for expression, format in self.highlightingRules:
-            index = expression.indexIn(text)
-            while index >= 0:
-                length = expression.matchedLength()
-                self.setFormat(index, length, format)
-                index = expression.indexIn(text, index + length)
+        for match in re.finditer(self._re_obj, text):
+            i, j = match.span()
+            self.setFormat(i, j-i, self.keywordFormat)
 
 
 def detect_darkmode_in_windows(): # automatically detect dark mode
