@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from multiprocessing import Process, Queue as MPQueue
+from PyQt5.QtGui import QSyntaxHighlighter
 from queue import Queue, Empty
 import os, sys
 
@@ -11,11 +12,6 @@ if __name__ == "__main__":
     from requests import Session
     import json
     import re
-    from tkinter import messagebox
-    import tkinter as tk
-    
-    root = tk.Tk()
-    root.withdraw()
     
     headers = {
         "Host": "api.shortlyai.com",
@@ -68,13 +64,17 @@ class UI(QMainWindow):
         self.generate         = self.findChild(QtWidgets.QPushButton, "pushButton")
         self.generate_once    = self.findChild(QtWidgets.QPushButton, "pushButton_2")
         self.amount_of_runs   = self.findChild(QtWidgets.QSpinBox, "spinBox")
-        self.content          = self.findChild(QtWidgets.QPlainTextEdit, "plainTextEdit")
-        self.story_background = self.findChild(QtWidgets.QPlainTextEdit, "plainTextEdit_2")
+        self.content          = self.findChild(QtWidgets.QTextEdit, "content_field")
+        self.story_background = self.findChild(QtWidgets.QTextEdit, "bg_field")
         self.topic            = self.findChild(QtWidgets.QLineEdit, "lineEdit")
         self.status_label     = self.findChild(QtWidgets.QLabel, "label_2")
         self.article_check    = self.findChild(QtWidgets.QRadioButton, "radioButton")
         self.story_check      = self.findChild(QtWidgets.QRadioButton, "radioButton_2")
         self.output_len_slider = self.findChild(QtWidgets.QSlider, "horizontalSlider")
+
+
+        # syntax highlighter
+        self.highlighter = Highlighter(self.content.document())
 
         # dividers
         if dark_mode:
@@ -142,7 +142,7 @@ class UI(QMainWindow):
     def _show_writing_stats(self):
         content         = self.content.toPlainText().replace('\u2029', '\n')
         selected_text   = self.content.textCursor().selectedText().replace('\u2029', '\n')
-        messagebox.showinfo(
+        QtWidgets.QMessageBox.information(self,
             'EssayGen - Writing Stats',
             (
                 "Selected character count:\t  "     + str(len(selected_text)) +
@@ -169,7 +169,7 @@ class UI(QMainWindow):
                 self.run_thread(self.amount_of_runs.value())
             return
         elif re.search(f'/({"|".join(special_commands.keys())})'+'\\ \\[[^\n\u2029]+\\]', stripped, flags=re.IGNORECASE):
-            if messagebox.askyesno('EssayGen - Error', 'Commands cannot be nested. Would you like to run the selected commands instead?'):
+            if QtWidgets.QMessageBox.Yes == QtWidgets.QMessageBox.question(self, 'EssayGen - Error', 'Commands cannot be nested. Would you like to run the selected commands instead?'):
                 nested_commands = self._check_for_commands(stripped, self.content.toPlainText())
                 if nested_commands == 1:
                     return
@@ -177,7 +177,7 @@ class UI(QMainWindow):
             self.activateWindow()
             return
         elif '\u2029' in stripped or '\n' in stripped:
-            messagebox.showerror('EssayGen - Error', 'Commands can not contain line breaks.')
+            QtWidgets.QMessageBox.critical(self, 'EssayGen - Error', 'Commands can not contain line breaks.')
             self.activateWindow()
             return
         
@@ -213,7 +213,7 @@ class UI(QMainWindow):
     def _over_charlimit(self, cmd_type, cmd, cmd_text):
         if len(cmd_text) > special_commands[cmd_type]:
             excess_chars = len(cmd_text) - special_commands[cmd_type]
-            if messagebox.askyesno('EssayGen - Input Error', f'The {cmd_type} command cannot exceed {special_commands[cmd_type]} characters. Would you like to highlight the excess {excess_chars} character{"s" if excess_chars != 1 else ""}?'):
+            if QtWidgets.QMessageBox.Yes == QtWidgets.QMessageBox.question(self, 'EssayGen - Input Error', f'The {cmd_type} command cannot exceed {special_commands[cmd_type]} characters. Would you like to highlight the excess {excess_chars} character{"s" if excess_chars != 1 else ""}?'):
                 cmd_pos = self.content.toPlainText().find(cmd) + len(cmd_type) + 3
                 cmd_end = cmd_pos + len(cmd_text)
                 cursor = self.content.textCursor()
@@ -239,7 +239,7 @@ class UI(QMainWindow):
                     and full_content.count(cmd) > 1
                     and _multi_run_warning
                 ):
-                    warning = messagebox.askokcancel('EssayGen - Error', 'You cannot have multiple instances of the same command. Continuing will ONLY run the first instance in the text.')
+                    warning = QtWidgets.QMessageBox.warning(self, 'EssayGen - Error', 'You cannot have multiple instances of the same command. Continuing will ONLY run the first instance in the text.')
                     self.activateWindow()
                     if warning:
                         _multi_run_warning = False # only warn once
@@ -256,11 +256,11 @@ class UI(QMainWindow):
 
         # check inputs for errors
         if not any([topic, story_bg, content]):
-            messagebox.showerror('EssayGen - Input Error', 'Please enter text in at least one field.')
+            QtWidgets.QMessageBox.critical(self, 'EssayGen - Input Error', 'Please enter text in at least one field.')
             self.activateWindow()
             return
         elif len(story_bg) > 500:
-            messagebox.showerror('EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
+            QtWidgets.QMessageBox.critical(self, 'EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
             self.activateWindow()
             return
 
@@ -289,7 +289,7 @@ class UI(QMainWindow):
             else:
                 # show error messages
                 if status_message.startswith('Error:'):
-                    messagebox.showerror('EssayGen - Run error', status_message)
+                    QtWidgets.QMessageBox.critical(self, 'EssayGen - Run error', status_message)
                     self.activateWindow()
                     self.status_label.setText(status_message.split('.')[0]) # first sentence
                 else:
@@ -362,7 +362,7 @@ class UI(QMainWindow):
     
     def start_tor_instance(self, set_reset_ident=False):
         self.setWindowTitle('EssayGen v1.4.1-beta - Starting session...')
-        self.tr = Session()
+        self.sess = Session()
         self.reset_ident = set_reset_ident
         self.setWindowTitle('EssayGen v1.4.1-beta - Running Cloudflare Challenge...')
         q = MPQueue()
@@ -406,7 +406,7 @@ class UI(QMainWindow):
                     "last_name":  random_str(randint(8, 15))
                 }
                 headers['Content-Length'] = str(len(str(data)))
-                create_acc = self.tr.post('https://api.shortlyai.com/auth/register/', data=json.dumps(data), headers=headers).json()
+                create_acc = self.sess.post('https://api.shortlyai.com/auth/register/', data=json.dumps(data), headers=headers).json()
                 if create_acc.get('token'):
                     self.runs_left = 4
                     self.token = create_acc['token']
@@ -438,7 +438,7 @@ class UI(QMainWindow):
                 headers["Content-Length"]   = str(len(json.dumps(data)))
                 
                 try:
-                    resp = self.tr.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data)).json()
+                    resp = self.sess.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data)).json()
                 except Exception as e:
                     self.return_error_msgbox(f'Error: Could not generate text. Error details are provided below\n{e}')
                     return
@@ -496,6 +496,28 @@ class UI(QMainWindow):
 
         for line in lines:
             line.setPalette(palette)
+
+
+class Highlighter(QSyntaxHighlighter):
+    def __init__(self, parent=None):
+        super(Highlighter, self).__init__(parent)
+
+        keywordFormat = QtGui.QTextCharFormat()
+        keywordFormat.setForeground(QtGui.QColor(200, 255, 200) if dark_mode else QtCore.Qt.darkGreen)
+        keywordFormat.setFontWeight(QtGui.QFont.DemiBold)
+
+        self.highlightingRules = [(
+            QtCore.QRegExp(f'/({"|".join(special_commands.keys())})'+'\\ \\[([^\n\u2029]+)?\\]'),
+            keywordFormat
+        )]
+        
+    def highlightBlock(self, text):
+        for expression, format in self.highlightingRules:
+            index = expression.indexIn(text)
+            while index >= 0:
+                length = expression.matchedLength()
+                self.setFormat(index, length, format)
+                index = expression.indexIn(text, index + length)
 
 
 def detect_darkmode_in_windows(): # automatically detect dark mode
