@@ -31,8 +31,12 @@ class UI(QMainWindow):
         self.show()
     
     def closeEvent(self, event):
-        if q: q.put_nowait(False)
-        super().closeEvent(event)
+        if q:
+            q.put_nowait(False)
+            self.hide()
+            input() # pause
+        else:
+            super().closeEvent(event)
 
 
 class WebViewer(QtWebEngineWidgets.QWebEngineView):
