@@ -31,9 +31,8 @@ class UI(QMainWindow):
         self.show()
     
     def closeEvent(self, event):
-        if q: q.put(False)
+        if q: q.put_nowait(False)
         super().closeEvent(event)
-        os._exit(0)
 
 
 class WebViewer(QtWebEngineWidgets.QWebEngineView):
@@ -91,7 +90,6 @@ def run(queue=None):
     q = queue
     app = QApplication(sys.argv)
     
-    MainWindow = QtWidgets.QMainWindow()
     ui = UI()
     ui.setupUi()
     app.exec_()

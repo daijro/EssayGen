@@ -5,6 +5,8 @@ from queue import Queue, Empty
 import os, sys
 
 if __name__ == "__main__":
+    from multiprocessing import freeze_support
+    freeze_support()
     from PyQt5 import QtWidgets, QtGui, QtCore
     from PyQt5 import uic
     from threading import Thread
@@ -57,7 +59,8 @@ class UI(QMainWindow):
         super(UI, self).__init__()
 
         uic.loadUi(resource_path("design.ui"), self)
-        self.setWindowIcon(QtGui.QIcon(resource_path('icons\\icon.ico')))
+        self._window_icon = QtGui.QIcon(resource_path('icons\\icon.ico'))
+        self.setWindowIcon(self._window_icon)
 
         # find the widgets in the xml file
         self.stackedWidget    = self.findChild(QtWidgets.QStackedWidget, "stackedWidget")
@@ -337,9 +340,6 @@ class UI(QMainWindow):
         self.stackedWidget.setCurrentIndex(0)
         self.status_label.setText('Preparing...') # Set for next time
         
-        if not self.runs_left and self.reset_ident:
-            self._start_tor_instance_async() # start new tor instance in background
-
 
     def return_error_msgbox(self, msg):
         self.status_queue.put_nowait(msg)
@@ -351,7 +351,6 @@ class UI(QMainWindow):
     
     runs_left   = 0
     token       = None
-    reset_ident = False    
     starting_tor_instance = Queue()
     
     
@@ -360,21 +359,21 @@ class UI(QMainWindow):
         t.daemon = True
         t.start()
     
-    def start_tor_instance(self, set_reset_ident=False):
-        self.setWindowTitle('EssayGen v1.4.1-beta - Starting session...')
+    def start_tor_instance(self):
+        self.setWindowTitle('EssayGen v1.4.1 - Starting session...')
         self.sess = Session()
-        self.reset_ident = set_reset_ident
-        self.setWindowTitle('EssayGen v1.4.1-beta - Running Cloudflare Challenge...')
-        q = MPQueue()
-        p = Process(target=cloudflare_solver.run, args=(q,))
+        self.setWindowTitle('EssayGen v1.4.1 - Running Cloudflare Challenge...')
+        p = Process(target=cloudflare_solver.run, args=(q := MPQueue(),))
         p.daemon = True
         p.start()
-        if h := q.get():
-            headers['User-Agent'] = h
-            self.setWindowTitle('EssayGen v1.4.1-beta - Ready')
-            self.starting_tor_instance.put('_')
-        else:
+        if not (h := q.get()):
+            (dialog_ := QtWidgets.QDialog(self)).setWindowIcon(self._window_icon)
+            QtWidgets.QMessageBox.critical(
+                dialog_, 'EssayGen - Error', 'Cloudflare challenge window closed. Cannot continue.')
             os._exit(0)
+        headers['User-Agent'] = h
+        self.setWindowTitle('EssayGen v1.4.1 - Ready')
+        self.starting_tor_instance.put(True)
         p.terminate()
         
 
@@ -386,7 +385,7 @@ class UI(QMainWindow):
             try:
                 self.starting_tor_instance.get(timeout=100)
             except Empty:
-                self.setWindowTitle('EssayGen v1.4.1-beta - Failed')
+                self.setWindowTitle('EssayGen v1.4.1 - Failed')
                 self.return_error_msgbox('Error: Failed to start')
                 return
             
