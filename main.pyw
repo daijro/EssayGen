@@ -5,6 +5,8 @@ from PyQt5.QtCore import pyqtSignal
 from queue import Queue, Empty
 import os, sys
 
+version = 'v1.4.1'
+
 if __name__ == "__main__":
     from multiprocessing import freeze_support
     freeze_support()
@@ -13,6 +15,7 @@ if __name__ == "__main__":
     from threading import Thread
     from random import randint
     from requests import Session
+    import darkdetect
     import json
     import re
     
@@ -32,11 +35,10 @@ if __name__ == "__main__":
         "Referer": "https://www.shortlyai.com/",
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "en-US,en;q=0.9"
-        }
+    }
 
 
 import cloudflare_solver
-
 
 special_commands = {
     'instruct':  200,
@@ -102,10 +104,16 @@ class UI(QMainWindow):
         self.article_check.toggled.connect(lambda: self.set_essay_background_placeholders())
         self.story_check.toggled.connect(lambda: self.set_essay_background_placeholders())
         
-        self.setWindowTitle_signal.connect(lambda x: self.setWindowTitle(x))
+        self.setWindowTitle_signal.connect(lambda x: self.setWindowTitle(f'EssayGen {version} - {x}'))
         self.cc_error_msg.connect(lambda: self.cloudflare_error())
+ 
+        self.status_signal.connect(lambda x: self._update_status(x))
+        self.err_signal.connect(lambda x: self._error_message(x))
+        self.content_signal.connect(lambda x, y: self._set_content(x, y))
+        self.done_signal.connect(lambda: self._on_done())
         
-        self._start_tor_instance_async()
+        
+        self._start_instance_async()
         
         # show ui
         self.show()
@@ -155,8 +163,10 @@ class UI(QMainWindow):
         ]
 
 
-    status_queue    = Queue()
-    content_queue   = Queue()
+    status_signal   = pyqtSignal(str)
+    err_signal      = pyqtSignal(str)
+    content_signal  = pyqtSignal(str, str)
+    done_signal     = pyqtSignal()
 
     def _show_writing_stats(self):
         content         = self.content.toPlainText().replace('\u2029', '\n')
@@ -299,115 +309,99 @@ class UI(QMainWindow):
         t = Thread(target=self.run, args=(amount, special_runs))
         t.daemon = True
         t.start()
-
-        while t.is_alive() or not self.content_queue.empty():
-            try: # check status queue
-                status_message = self.status_queue.get(timeout=0.01)
-            except Empty:
-                pass
-            else:
-                # show error messages
-                if status_message.startswith('Error:'):
-                    QtWidgets.QMessageBox.critical(self, 'EssayGen - Run error', status_message)
-                    self.activateWindow()
-                    self.status_label.setText(status_message.split('.')[0]) # first sentence
-                else:
-                    self.status_label.setText(status_message)
-                self.status_queue.task_done()
-            try: # check content_queue
-                content, cmd = self.content_queue.get(timeout=0.01)
-            except Empty:
-                pass
-            else:
-                scrollval   = self.content.verticalScrollBar().value()
-                old_content = self.content.toPlainText()
-
-                # insert content using cursor
-                cursor = self.content.textCursor()
-                cursor.beginEditBlock()
-                
-                if cmd:
-                    cmd_pos_start = old_content.find(cmd)
-                    cmd_pos_end   = cmd_pos_start + len(cmd)
-                    
-                    # remove the command
-                    cursor.setPosition(cmd_pos_start, QtGui.QTextCursor.MoveAnchor)
-                    cursor.setPosition(cmd_pos_end, QtGui.QTextCursor.KeepAnchor)
-                    cursor.removeSelectedText()
-                    cursor.setPosition(cmd_pos_start)
-                    
-                cursor.insertText(content)
-                cursor.endEditBlock()
-                # set text cursor
-                self.content.setTextCursor(cursor)
-                
-                # set text scrollbar to same position
-                scrollbar = QtWidgets.QScrollBar()
-                scrollbar.setValue(scrollval)
-                self.content.setVerticalScrollBar(scrollbar)
-
-                self.content_queue.task_done()
-
-            QtWidgets.QApplication.processEvents() # update interface
-            
-        # re enable editing in text boxes
-        self.toggle_text_boxes(True)
-        
-        self.stackedWidget.setCurrentIndex(0)
-        self.status_label.setText('Preparing...') # Set for next time
         
 
-    def return_error_msgbox(self, msg):
-        self.status_queue.put_nowait(msg)
-        self.status_queue.join()
+    def _error_message(self, err_msg):
+        QtWidgets.QMessageBox.critical(self, 'EssayGen - Run error', err_msg)
+        self.activateWindow()
+        self._update_status(f'Error: {err_msg.split(".")[0]}') # first sentence
         self.runs_left = 0
-        self.stackedWidget.setCurrentIndex(0)
-        QtWidgets.QApplication.processEvents()
+        
+    def _update_status(self, status_message):
+        self.status_label.setText(status_message)
 
+    def _set_content(self, content, cmd=None):
+        scrollval   = self.content.verticalScrollBar().value()
+        old_content = self.content.toPlainText()
+
+        # insert content using cursor
+        cursor = self.content.textCursor()
+        cursor.beginEditBlock()
+        
+        if cmd:
+            cmd_pos_start = old_content.find(cmd)
+            cmd_pos_end   = cmd_pos_start + len(cmd)
+            
+            # remove the command
+            cursor.setPosition(cmd_pos_start, QtGui.QTextCursor.MoveAnchor)
+            cursor.setPosition(cmd_pos_end, QtGui.QTextCursor.KeepAnchor)
+            cursor.removeSelectedText()
+            cursor.setPosition(cmd_pos_start)
+            
+        cursor.insertText(content)
+        cursor.endEditBlock()
+        # set text cursor
+        self.content.setTextCursor(cursor)
+        
+        # set text scrollbar to same position
+        scrollbar = QtWidgets.QScrollBar()
+        scrollbar.setValue(scrollval)
+        self.content.setVerticalScrollBar(scrollbar)
+
+    def _on_done(self):
+        self.toggle_text_boxes(True)
+        self.stackedWidget.setCurrentIndex(0)
+        self.status_label.setText('Preparing...')
+        
+    def _signal_when_done(func):
+        def _func(*args):
+            func(*args); args[0].done_signal.emit()
+        return _func
+    
     
     runs_left   = 0
     token       = None
     starting_tor_instance = Queue()
     
-    def _start_tor_instance_async(self):
-        t = Thread(target=self.start_tor_instance)
+    def _start_instance_async(self):
+        t = Thread(target=self.start_instance)
         t.daemon = True
         t.start()
     
-    def start_tor_instance(self):
-        self.setWindowTitle_signal.emit('EssayGen v1.4.1 - Starting session...')
+    def start_instance(self):
+        self.setWindowTitle_signal.emit('Starting session...')
         self.sess = Session()
-        self.setWindowTitle_signal.emit('EssayGen v1.4.1 - Running Cloudflare Challenge...')
+        self.setWindowTitle_signal.emit('Running Cloudflare Challenge...')
         p = Process(target=cloudflare_solver.run, args=(q := MPQueue(),))
         p.daemon = True
         p.start()
         if not (h := q.get()):
             self.cc_error_msg.emit()
             if self.cc_error_queue.get():
-                return self.start_tor_instance()
+                return self.start_instance()
             os._exit(0)
         headers['User-Agent'] = h
-        self.setWindowTitle_signal.emit('EssayGen v1.4.1 - Ready')
+        self.setWindowTitle_signal.emit('Ready')
         self.starting_tor_instance.put(True)
         p.terminate()
         
-
+    
+    @_signal_when_done
     def run(self, amount, special_runs=None):
         original_amount = amount
 
         if self.starting_tor_instance.empty():
-            self.status_queue.put_nowait('Processing...')
             try:
-                self.starting_tor_instance.get(timeout=100)
+                self.starting_tor_instance.get(timeout=60)
             except Empty:
-                self.setWindowTitle('EssayGen v1.4.1 - Failed')
-                self.return_error_msgbox('Error: Failed to start')
+                self.setWindowTitle_signal('Failed')
+                self.err_signal.emit('Failed to start')
                 return
             
         while amount > 0:
             # create account
             if self.runs_left == 0:
-                self.status_queue.put_nowait('Registering new account...')
+                self.status_signal.emit('Registering new account...')
                 self.sess.cookies.clear()
                 passwrd = random_str(15)
                 data = {
@@ -423,12 +417,12 @@ class UI(QMainWindow):
                     self.runs_left = 4
                     self.token = create_acc['token']
                 else:
-                    self.return_error_msgbox('Error: Could not register account')
+                    self.err_signal.emit('Could not register account')
                     return
 
             # generate
             for _ in range(min(amount, 4)):
-                self.status_queue.put_nowait('Generating text...'+ (
+                self.status_signal.emit('Generating text...'+ (
                     f' ({"command" if special_runs else "run"} {(original_amount - amount) + 1}/{original_amount})'
                     if (original_amount-amount, original_amount) != (0, 1)
                     else ''
@@ -452,26 +446,25 @@ class UI(QMainWindow):
                 try:
                     resp = self.sess.post('https://api.shortlyai.com/stories/write-for-me/', headers=headers, data=json.dumps(data)).json()
                 except Exception as e:
-                    self.return_error_msgbox(f'Error: Could not generate text. Error details are provided below\n{e}')
+                    self.err_signal.emit(f'Could not generate text. Error details are provided below\n{e}')
                     return
 
                 # error
                 if not resp.get('text'):
                     if 'message' in resp:
-                        self.return_error_msgbox(f'Error: {resp["message"]}')
+                        self.err_signal.emit(f'{resp["message"]}')
                     else:
-                        self.return_error_msgbox('Error: Could not find output')
+                        self.err_signal.emit('Could not find output')
                     return
 
                 # set text
                 if not self.content.toPlainText().strip() or special_runs:
                     resp['text'] = resp['text'].lstrip()
                     
-                self.content_queue.put_nowait((
+                self.content_signal.emit(
                     resp['text'],
                     special_runs[original_amount-amount][1] if special_runs else ''
-                ))
-                self.content_queue.join()
+                )
 
                 self.runs_left  -= 1
                 amount          -= 1
@@ -494,16 +487,8 @@ class UI(QMainWindow):
 
     def set_line_color(self, brush, lines: list):
         palette = QtGui.QPalette()
-        palette_items = [
-            QtGui.QPalette.WindowText,      QtGui.QPalette.Button,      QtGui.QPalette.Light,
-            QtGui.QPalette.Midlight,        QtGui.QPalette.Dark,        QtGui.QPalette.Mid,
-            QtGui.QPalette.Text,            QtGui.QPalette.BrightText,  QtGui.QPalette.ButtonText,
-            QtGui.QPalette.Base,            QtGui.QPalette.Window,      QtGui.QPalette.Shadow,
-            QtGui.QPalette.AlternateBase,   QtGui.QPalette.ToolTipBase, QtGui.QPalette.ToolTipText,
-            QtGui.QPalette.PlaceholderText,
-        ]
         for color_role in [QtGui.QPalette.Active, QtGui.QPalette.Inactive, QtGui.QPalette.Disabled]:
-            for palette_item in palette_items:
+            for palette_item in [QtGui.QPalette.Light, QtGui.QPalette.Dark]:
                 palette.setBrush(color_role, palette_item, brush)
 
         for line in lines:
@@ -516,7 +501,6 @@ class Highlighter(QSyntaxHighlighter):
 
         self.keywordFormat = QtGui.QTextCharFormat()
         self.keywordFormat.setForeground(QtGui.QColor(200, 255, 200) if dark_mode else QtCore.Qt.darkGreen)
-        self.keywordFormat.setFontWeight(QtGui.QFont.DemiBold)
         self._re_obj = re.compile(f'/({"|".join(special_commands.keys())})'+'\\ \\[([^\n\u2029]+)?\\]', flags=re.IGNORECASE)
         
     def highlightBlock(self, text):
@@ -525,40 +509,14 @@ class Highlighter(QSyntaxHighlighter):
             self.setFormat(i, j-i, self.keywordFormat)
 
 
-def detect_darkmode_in_windows(): # automatically detect dark mode
-    try:
-        import winreg
-    except ImportError:
-        return False
-    registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
-    reg_keypath = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-    try:
-        reg_key = winreg.OpenKey(registry, reg_keypath)
-    except FileNotFoundError:
-        return False
-
-    for i in range(1024):
-        try:
-            value_name, value, _ = winreg.EnumValue(reg_key, i)
-            if value_name == 'AppsUseLightTheme':
-                return value == 0
-        except OSError:
-            break
-    return False
-
-
 if __name__ == "__main__":
     # initialize app
     app = QApplication(sys.argv)
 
-
-    # dark mode palette ------------------------------
     app.setStyle('Fusion')
 
-    light_palette = QtGui.QPalette()
-
-    if detect_darkmode_in_windows():
-        dark_mode = True
+    # dark mode palette
+    if (dark_mode := darkdetect.isDark()):
         dark_palette = QtGui.QPalette()
         dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(25,35,45))
         dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
@@ -573,8 +531,6 @@ if __name__ == "__main__":
         dark_palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(20, 129, 216))
         dark_palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
         app.setPalette(dark_palette)
-    else:
-        dark_mode = False
 
     # fonts
     QtGui.QFontDatabase.addApplicationFont(resource_path('fonts\\Poppins-Medium.ttf'))
