@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from multiprocessing import Process, Queue as MPQueue
 from PyQt5.QtGui import QSyntaxHighlighter
+from PyQt5.QtCore import pyqtSignal
 from queue import Queue, Empty
 import os, sys
 
@@ -97,16 +98,31 @@ class UI(QMainWindow):
         QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+]'), self).activated.connect(lambda: self._command_shortcut('expand'))
         QtWidgets.QShortcut(QtGui.QKeySequence('Ctrl+Shift+C'), self).activated.connect(lambda: self._show_writing_stats())
         
+        self.set_essay_background_placeholders()
         self.article_check.toggled.connect(lambda: self.set_essay_background_placeholders())
         self.story_check.toggled.connect(lambda: self.set_essay_background_placeholders())
-
-        self.set_essay_background_placeholders()
+        
+        self.setWindowTitle_signal.connect(lambda x: self.setWindowTitle(x))
+        self.cc_error_msg.connect(lambda: self.cloudflare_error())
+        
         self._start_tor_instance_async()
         
         # show ui
         self.show()
         
-                
+    
+    setWindowTitle_signal   = pyqtSignal(str)
+    cc_error_msg            = pyqtSignal()
+    cc_error_queue          = Queue()
+    
+    def cloudflare_error(self):
+        self.cc_error_queue.put_nowait(
+            QtWidgets.QMessageBox.question(
+                self, 'EssayGen - Error', 'Cloudflare challenge window closed. Would you like to retry?', QtWidgets.QMessageBox.Retry | QtWidgets.QMessageBox.Close
+            ) == QtWidgets.QMessageBox.Retry
+        )
+           
+    
     def toggle_text_boxes(self, toggle):
         self.content.setReadOnly(not toggle)
         self.story_background.setReadOnly(not toggle)
@@ -353,26 +369,25 @@ class UI(QMainWindow):
     token       = None
     starting_tor_instance = Queue()
     
-    
     def _start_tor_instance_async(self):
         t = Thread(target=self.start_tor_instance)
         t.daemon = True
         t.start()
     
     def start_tor_instance(self):
-        self.setWindowTitle('EssayGen v1.4.1 - Starting session...')
+        self.setWindowTitle_signal.emit('EssayGen v1.4.1 - Starting session...')
         self.sess = Session()
-        self.setWindowTitle('EssayGen v1.4.1 - Running Cloudflare Challenge...')
+        self.setWindowTitle_signal.emit('EssayGen v1.4.1 - Running Cloudflare Challenge...')
         p = Process(target=cloudflare_solver.run, args=(q := MPQueue(),))
         p.daemon = True
         p.start()
         if not (h := q.get()):
-            (dialog_ := QtWidgets.QDialog(self)).setWindowIcon(self._window_icon)
-            QtWidgets.QMessageBox.critical(
-                dialog_, 'EssayGen - Error', 'Cloudflare challenge window closed. Cannot continue.')
+            self.cc_error_msg.emit()
+            if self.cc_error_queue.get():
+                return self.start_tor_instance()
             os._exit(0)
         headers['User-Agent'] = h
-        self.setWindowTitle('EssayGen v1.4.1 - Ready')
+        self.setWindowTitle_signal.emit('EssayGen v1.4.1 - Ready')
         self.starting_tor_instance.put(True)
         p.terminate()
         

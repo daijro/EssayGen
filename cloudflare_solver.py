@@ -34,7 +34,8 @@ class UI(QMainWindow):
         if q:
             q.put_nowait(False)
             self.hide()
-            input() # pause
+            try: input() # pause
+            except EOFError: exit()
         else:
             super().closeEvent(event)
 
