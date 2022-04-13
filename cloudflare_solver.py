@@ -1,5 +1,6 @@
 from PyQt5 import QtGui, QtCore, QtWidgets, QtWebEngineWidgets
 from PyQt5.QtWidgets import QMainWindow, QApplication
+from PyQt5.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 import sys
 import os
 
@@ -15,7 +16,7 @@ def resource_path(relative_path):
 class UI(QMainWindow):
     def setupUi(self):
         self.setObjectName("MainWindow")
-        self.resize(800, 600)
+        self.resize(700, 350)
         self.setWindowTitle('EssayGen - Cloudflare Challenge')
         self.setWindowIcon(QtGui.QIcon(resource_path('icons\\icon.ico')))
         self.centralwidget = QtWidgets.QWidget(self)
@@ -23,7 +24,7 @@ class UI(QMainWindow):
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
         self.gridLayout.setObjectName("gridLayout")
         
-        self.web_page = WebViewer()
+        self.web_page = WebViewer(window=self)
         self.gridLayout.addWidget(self.web_page, 0, 0, 1, 1)
         self.setCentralWidget(self.centralwidget)
 
@@ -40,8 +41,20 @@ class UI(QMainWindow):
             super().closeEvent(event)
 
 
+class WebInterceptor(QWebEngineUrlRequestInterceptor):
+    def __init__(self, parent, _window):
+        self.window = _window
+        super().__init__(parent)
+    
+    def interceptRequest(self, info):
+        if info.requestUrl().toString().startswith('https://hcaptcha.com/getcaptcha') and not self.window.isMaximized():
+            self.window.resize(self.window.width(), max(610, self.window.height())) # expand window
+            self.window.raise_()
+            self.window.activateWindow()
+            
+
 class WebViewer(QtWebEngineWidgets.QWebEngineView):
-    def __init__(self):
+    def __init__(self, window):
         super().__init__()
         
         # Automatically click HCaptcha checkbox
@@ -61,7 +74,7 @@ class WebViewer(QtWebEngineWidgets.QWebEngineView):
             } else {
                 return;
             }
-        }, 2000);}"""
+        }, 500);}"""
         hcaptchaClicker = QtWebEngineWidgets.QWebEngineScript()
         hcaptchaClicker.setName("qwebchannel.js"); 
         hcaptchaClicker.setInjectionPoint(QtWebEngineWidgets.QWebEngineScript.DocumentCreation) # important
@@ -70,6 +83,7 @@ class WebViewer(QtWebEngineWidgets.QWebEngineView):
         hcaptchaClicker.setSourceCode(jsStr)
         
         self.profile = QtWebEngineWidgets.QWebEngineProfile()
+        self.profile.setUrlRequestInterceptor(WebInterceptor(self, window))
         self.page = InstrumentedPage(self.profile, self)
         
         # inject js
