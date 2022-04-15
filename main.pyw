@@ -1,11 +1,12 @@
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from multiprocessing import Process, Queue as MPQueue
 from PyQt5.QtGui import QSyntaxHighlighter
+from PyQt5.QtWidgets import QMessageBox as QMsg
 from PyQt5.QtCore import pyqtSignal
 from queue import Queue, Empty
 import os, sys
 
-version = 'v1.4.1'
+version = 'v1.4.2'
 
 if __name__ == "__main__":
     from multiprocessing import freeze_support
@@ -16,6 +17,7 @@ if __name__ == "__main__":
     from random import randint
     from requests import Session
     import darkdetect
+    import ctypes as ct
     import json
     import re
     
@@ -114,7 +116,7 @@ class UI(QMainWindow):
         
         
         self._start_instance_async()
-        
+        dark_title_bar(int(self.winId()))
         # show ui
         self.show()
         
@@ -124,12 +126,25 @@ class UI(QMainWindow):
     cc_error_queue          = Queue()
     
     def cloudflare_error(self):
+        self.setWindowTitle_signal.emit('Cloudflare cancelled')
         self.cc_error_queue.put_nowait(
-            QtWidgets.QMessageBox.question(
-                self, 'EssayGen - Error', 'Cloudflare challenge window closed. Would you like to retry?', QtWidgets.QMessageBox.Retry | QtWidgets.QMessageBox.Close
-            ) == QtWidgets.QMessageBox.Retry
+            self.send_msg(
+                'EssayGen - Error',
+                'Cloudflare challenge window closed. Would you like to retry?',
+                QMsg.Question,
+                QMsg.Retry | QMsg.Close
+            ) == QMsg.Retry
         )
-           
+         
+    def send_msg(self, title, text, icon=QMsg.Critical, buttons=QMsg.Ok):
+        msg_box = QMsg(self)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(text)
+        msg_box.setIcon(icon)
+        msg_box.setStandardButtons(buttons)
+        dark_title_bar(int(msg_box.winId()))
+        return msg_box.exec_()
+          
     
     def toggle_text_boxes(self, toggle):
         self.content.setReadOnly(not toggle)
@@ -171,17 +186,18 @@ class UI(QMainWindow):
     def _show_writing_stats(self):
         content         = self.content.toPlainText().replace('\u2029', '\n')
         selected_text   = self.content.textCursor().selectedText().replace('\u2029', '\n')
-        QtWidgets.QMessageBox.information(self,
+        self.send_msg(
             'EssayGen - Writing Stats',
             (
                 "Selected character count:\t  "     + str(len(selected_text)) +
                 "\nSelected chars (no spaces):\t  " + str(len(re.sub(r'\s', '', selected_text))) +
                 "\nSelected word count:\t  "        + str(len(selected_text.split()))
             ) if selected_text else (
-                "Character count:\t   "     + str(len(content)) +
-                "\nChars (no spaces):\t   " + str(len(re.sub(r'\s', '', content))) +
-                "\nWord count:\t   "        + str(len(content.split()))
-            )
+                "Character count:\t\t"     + str(len(content)) +
+                "\nChars (no spaces):\t\t" + str(len(re.sub(r'\s', '', content))) +
+                "\nWord count:\t\t"          + str(len(content.split()))
+            ),
+            QMsg.Information,
         )
         self.activateWindow()
         
@@ -198,7 +214,12 @@ class UI(QMainWindow):
                 self.run_thread(self.amount_of_runs.value())
             return
         elif re.search(f'/({"|".join(special_commands.keys())})'+'\\ \\[[^\n\u2029]+\\]', stripped, flags=re.IGNORECASE):
-            if QtWidgets.QMessageBox.Yes == QtWidgets.QMessageBox.question(self, 'EssayGen - Error', 'Commands cannot be nested. Would you like to run the selected commands instead?'):
+            if QMsg.Yes == self.send_msg(
+                'EssayGen - Error',
+                'Commands cannot be nested. Would you like to run the selected commands instead?',
+                QMsg.Question,
+                QMsg.Yes | QMsg.No
+            ):
                 nested_commands = self._check_for_commands(stripped, self.content.toPlainText())
                 if nested_commands == 1:
                     return
@@ -206,7 +227,11 @@ class UI(QMainWindow):
             self.activateWindow()
             return
         elif '\u2029' in stripped or '\n' in stripped:
-            QtWidgets.QMessageBox.critical(self, 'EssayGen - Error', 'Commands can not contain line breaks.')
+            self.send_msg(
+                'EssayGen - Error',
+                'Commands can not contain line breaks.',
+                QMsg.Critical,
+            )
             self.activateWindow()
             return
         
@@ -242,7 +267,12 @@ class UI(QMainWindow):
     def _over_charlimit(self, cmd_type, cmd, cmd_text):
         if len(cmd_text) > special_commands[cmd_type]:
             excess_chars = len(cmd_text) - special_commands[cmd_type]
-            if QtWidgets.QMessageBox.Yes == QtWidgets.QMessageBox.question(self, 'EssayGen - Input Error', f'The {cmd_type} command cannot exceed {special_commands[cmd_type]} characters. Would you like to highlight the excess {excess_chars} character{"s" if excess_chars != 1 else ""}?'):
+            if QMsg.Yes == self.send_msg(
+                'EssayGen - Input Error',
+                f'The {cmd_type} command cannot exceed {special_commands[cmd_type]} characters. Would you like to highlight the excess {excess_chars} character{"s" if excess_chars != 1 else ""}?',
+                QMsg.Critical,
+                QMsg.Yes | QMsg.No
+                ):
                 cmd_pos = self.content.toPlainText().find(cmd) + len(cmd_type) + 3
                 cmd_end = cmd_pos + len(cmd_text)
                 cursor = self.content.textCursor()
@@ -268,9 +298,14 @@ class UI(QMainWindow):
                     and full_content.count(cmd) > 1
                     and _multi_run_warning
                 ):
-                    warning = QtWidgets.QMessageBox.warning(self, 'EssayGen - Error', 'You cannot have multiple instances of the same command. Continuing will ONLY run the first instance in the text.')
+                    warning = self.send_msg(
+                        'EssayGen - Error',
+                        'You cannot have multiple instances of the same command. Continuing will ONLY run the first instance in the text.',
+                        QMsg.Warning,
+                        QMsg.Ok | QMsg.Cancel
+                    )
                     self.activateWindow()
-                    if warning:
+                    if warning == QMsg.Ok:
                         _multi_run_warning = False # only warn once
                     else:
                         return 1
@@ -285,11 +320,11 @@ class UI(QMainWindow):
 
         # check inputs for errors
         if not any([topic, story_bg, content]):
-            QtWidgets.QMessageBox.critical(self, 'EssayGen - Input Error', 'Please enter text in at least one field.')
+            self.send_msg('EssayGen - Input Error', 'Please enter text in at least one field.')
             self.activateWindow()
             return
         elif len(story_bg) > 500:
-            QtWidgets.QMessageBox.critical(self, 'EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
+            self.send_msg('EssayGen - Input Error', 'The content background field cannot exceed 500 characters. Please try again.')
             self.activateWindow()
             return
 
@@ -312,7 +347,7 @@ class UI(QMainWindow):
         
 
     def _error_message(self, err_msg):
-        QtWidgets.QMessageBox.critical(self, 'EssayGen - Run error', err_msg)
+        self.send_msg('EssayGen - Run error', err_msg)
         self.activateWindow()
         self._update_status(f'Error: {err_msg.split(".")[0]}') # first sentence
         self.runs_left = 0
@@ -352,10 +387,13 @@ class UI(QMainWindow):
         self.toggle_text_boxes(True)
         self.stackedWidget.setCurrentIndex(0)
         self.status_label.setText('Preparing...')
+        self.setWindowTitle(f'EssayGen {version}')
         
     def _signal_when_done(func):
-        def _func(*args):
-            func(*args); args[0].done_signal.emit()
+        def _func(self, *args):
+            self.setWindowTitle_signal.emit('Generating...')
+            func(self, *args)
+            self.done_signal.emit()
         return _func
     
     
@@ -371,7 +409,7 @@ class UI(QMainWindow):
     def start_instance(self):
         self.setWindowTitle_signal.emit('Starting session...')
         self.sess = Session()
-        self.setWindowTitle_signal.emit('Running Cloudflare Challenge...')
+        self.setWindowTitle_signal.emit('Running Cloudflare...')
         p = Process(target=cloudflare_solver.run, args=(q := MPQueue(),))
         p.daemon = True
         p.start()
@@ -508,6 +546,19 @@ class Highlighter(QSyntaxHighlighter):
             i, j = match.span()
             self.setFormat(i, j-i, self.keywordFormat)
 
+
+def dark_title_bar(hwnd):
+    if not (dark_mode and sys.platform == 'win32' and (version_num := sys.getwindowsversion()).major == 10):
+        return
+    set_window_attribute = ct.windll.dwmapi.DwmSetWindowAttribute
+    if version_num.build >= 22000: # windows 11
+        color = ct.c_int(0x2d2319)
+        set_window_attribute(hwnd, 35, ct.byref(color), ct.sizeof(color))
+    else:
+        rendering_policy = 19 if version_num.build < 19041 else 20 # 19 before 20h1
+        value = ct.c_int(True)
+        set_window_attribute(hwnd, rendering_policy, ct.byref(value), ct.sizeof(value))
+        
 
 if __name__ == "__main__":
     # initialize app

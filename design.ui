@@ -17,7 +17,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>EssayGen v1.4.1 - Processing...</string>
+   <string>Preparing...</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="font">
