@@ -80,18 +80,8 @@ class UI(QMainWindow):
         self.story_check      = self.findChild(QtWidgets.QRadioButton, "radioButton_2")
         self.output_len_slider = self.findChild(QtWidgets.QSlider, "horizontalSlider")
 
-
         # syntax highlighter
-        self.highlighter = Highlighter(self.content.document())
-
-        # dividers
-        if dark_mode:
-            self.horizonal_l1 = self.findChild(QtWidgets.QFrame, "line")
-            self.horizonal_l2 = self.findChild(QtWidgets.QFrame, "line_2")
-            brush = QtGui.QBrush(QtGui.QColor(39, 49, 58))
-            brush.setStyle(QtCore.Qt.SolidPattern)
-            self.set_line_color(brush, [self.horizonal_l1, self.horizonal_l2])
-            
+        self.highlighter = Highlighter(self.content.document())            
 
         # set connections
         self.generate.clicked.connect(lambda: self._command_shortcut())
@@ -523,16 +513,6 @@ class UI(QMainWindow):
             )
 
 
-    def set_line_color(self, brush, lines: list):
-        palette = QtGui.QPalette()
-        for color_role in [QtGui.QPalette.Active, QtGui.QPalette.Inactive, QtGui.QPalette.Disabled]:
-            for palette_item in [QtGui.QPalette.Light, QtGui.QPalette.Dark]:
-                palette.setBrush(color_role, palette_item, brush)
-
-        for line in lines:
-            line.setPalette(palette)
-
-
 class Highlighter(QSyntaxHighlighter):
     def __init__(self, parent=None):
         super(Highlighter, self).__init__(parent)
@@ -570,6 +550,8 @@ if __name__ == "__main__":
     if (dark_mode := darkdetect.isDark()):
         dark_palette = QtGui.QPalette()
         dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(25,35,45))
+        dark_palette.setColor(QtGui.QPalette.Light, QtGui.QColor(39, 49, 58))
+        dark_palette.setColor(QtGui.QPalette.Dark, QtGui.QColor(39, 49, 58))
         dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
         dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(39, 49, 58))
         dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(25,35,45))
