@@ -2,7 +2,7 @@
 
 <strong>(Educational purposes only)</strong>
 
-ShortlyAI is an advanced essay generating tool that uses the GPT-3 AI. Its demo only allows you to run it up to 4 times before it locks your access and requries you to pay $25/month. This bot will register new demo accounts using TOR, and allow you to continue generating your essay.
+ShortlyAI is an advanced essay generating tool that uses the GPT-3 AI. Its demo only allows you to run it up to 4 times before it locks your access and requries you to pay $79/month. This bot will register new demo accounts, and allow you to continue generating your essay.
 
 <hr width=50>
 
@@ -61,10 +61,11 @@ To find more tips on how to effectly make use of GPT-3, you can visit the [Short
 
 ## Screenshot
 
-![image](https://i.imgur.com/zh44vvv.png)
+![image](https://user-images.githubusercontent.com/72637910/163756731-0000736a-c748-4b57-810f-30f9933aea6c.png)
+
 
 <hr width=50>
 
 ## Disclaimer
 
-This bot is meant to demonstrate how torrequests can be used in webscraping and is for EDUCATIONAL PURPOSES ONLY! Please consider supporting the developers.
+This bot is meant to demonstrate how QWebEngine & requests can be used in webscraping and is for EDUCATIONAL PURPOSES ONLY! Please consider supporting the developers.
